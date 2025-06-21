@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Stack } from '@tamagui/core';
 import { TouchableOpacity } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Dumbbell, Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
@@ -28,18 +29,22 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
     };
 
     return (
-        <View
-            padding={20}
-            backgroundColor={isDark ? COLORS.primaryDark : COLORS.primary}
-            paddingTop={60}
-            borderBottomLeftRadius={20}
-            borderBottomRightRadius={20}
+        <BlurView
+            intensity={isDark ? 20 : 30}
+            tint={isDark ? 'dark' : 'light'}
             style={{
+                padding: 20,
+                paddingTop: 60,
+                borderBottomLeftRadius: 20,
+                borderBottomRightRadius: 20,
                 shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.3,
                 shadowRadius: 8,
                 elevation: 8,
+                backgroundColor: isDark
+                    ? `${COLORS.primaryDark}80`
+                    : `${COLORS.primary}80`,
             }}
         >
             <Stack flexDirection="row" justifyContent="space-between" alignItems="center">
@@ -92,6 +97,6 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                     </Text>
                 </TouchableOpacity>
             </Stack>
-        </View>
+        </BlurView>
     );
 }; 

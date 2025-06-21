@@ -21,7 +21,7 @@ const AppContent = () => {
 
   const handleNavigate = (screen: Screen) => {
     setCurrentScreen(screen);
-  };
+  };  
 
   const renderScreen = () => {
     switch (currentScreen) {
