@@ -11,8 +11,21 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
-    const { theme, toggleTheme } = useTheme();
-    const isDark = theme === 'dark';
+    const { theme, toggleTheme, resolvedTheme } = useTheme();
+    const isDark = resolvedTheme === 'dark';
+
+    const getThemeIcon = () => {
+        switch (theme) {
+            case 'system':
+                return isDark ? '☀️' : '🌙';
+            case 'light':
+                return '🌙';
+            case 'dark':
+                return '☀️';
+            default:
+                return '🌙';
+        }
+    };
 
     return (
         <View
@@ -70,11 +83,13 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                         elevation: 4,
                     }}
                 >
-                    {isDark ? (
-                        <Sun size={20} color="white" />
-                    ) : (
-                        <Moon size={20} color="white" />
-                    )}
+                    <Text
+                        color="white"
+                        fontSize={16}
+                        fontWeight="bold"
+                    >
+                        {getThemeIcon()}
+                    </Text>
                 </TouchableOpacity>
             </Stack>
         </View>

@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
     theme: Theme;
+    resolvedTheme: 'light' | 'dark';
     toggleTheme: () => void;
     setTheme: (theme: Theme) => void;
 }
@@ -25,21 +26,27 @@ interface ThemeProviderProps {
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const systemColorScheme = useColorScheme();
-    const [theme, setTheme] = useState<Theme>('light');
+    const [theme, setTheme] = useState<Theme>('system');
 
-    // Initialize theme based on system preference
-    useEffect(() => {
-        if (systemColorScheme) {
-            setTheme(systemColorScheme);
+    // Calculate resolved theme based on current setting
+    const resolvedTheme = React.useMemo(() => {
+        if (theme === 'system') {
+            return systemColorScheme || 'light';
         }
-    }, [systemColorScheme]);
+        return theme;
+    }, [theme, systemColorScheme]);
 
     const toggleTheme = () => {
-        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+        setTheme(prev => {
+            if (prev === 'light') return 'dark';
+            if (prev === 'dark') return 'system';
+            return 'light';
+        });
     };
 
     const value = {
         theme,
+        resolvedTheme,
         toggleTheme,
         setTheme,
     };

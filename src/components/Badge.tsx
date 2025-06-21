@@ -5,7 +5,7 @@ import { COLORS } from '../constants/colors';
 
 interface BadgeProps {
     label: string;
-    variant?: 'primary' | 'secondary' | 'success' | 'complementary';
+    variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'complementary';
     size?: 'small' | 'medium' | 'large';
 }
 
@@ -54,6 +54,16 @@ export const Badge: React.FC<BadgeProps> = ({
                 return {
                     ...baseStyles,
                     backgroundColor: isDark ? COLORS.successLight : COLORS.success,
+                };
+            case 'warning':
+                return {
+                    ...baseStyles,
+                    backgroundColor: isDark ? COLORS.warningLight : COLORS.warning,
+                };
+            case 'error':
+                return {
+                    ...baseStyles,
+                    backgroundColor: isDark ? COLORS.errorLight : COLORS.error,
                 };
             case 'complementary':
                 return {

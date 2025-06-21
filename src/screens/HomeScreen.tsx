@@ -1,17 +1,18 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
-import { Play, History, Calendar, TrendingUp, Zap } from 'lucide-react-native';
-import { Header } from '../components/Header';
+import { Play, History, Calendar, TrendingUp } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 
 export const HomeScreen: React.FC = () => {
-    const { theme } = useTheme();
-    const isDark = theme === 'dark';
+    const { resolvedTheme } = useTheme();
+    const { formatWeight } = useSettings();
+    const isDark = resolvedTheme === 'dark';
 
     const handleStartWorkout = () => {
         console.log('Start workout pressed');
@@ -31,8 +32,10 @@ export const HomeScreen: React.FC = () => {
     ];
 
     const progressItems = [
-        { exercise: 'Bench Press 1RM', progress: '+5 lbs' },
-        { exercise: 'Deadlift 1RM', progress: '+10 lbs' },
+        { exercise: 'Bench Press 1RM', weight: 100, change: 5, status: 'success' as const },
+        { exercise: 'Deadlift 1RM', weight: 180, change: 10, status: 'success' as const },
+        { exercise: 'Squat 1RM', weight: 140, change: 0, status: 'warning' as const },
+        { exercise: 'Overhead Press 1RM', weight: 70, change: -2, status: 'error' as const },
     ];
 
     return (
@@ -112,46 +115,28 @@ export const HomeScreen: React.FC = () => {
                 <Stack gap={12}>
                     {progressItems.map((item, index) => (
                         <Stack key={index} flexDirection="row" justifyContent="space-between" alignItems="center">
-                            <Text
-                                fontSize={16}
-                                color={isDark ? COLORS.textDark : COLORS.text}
-                                fontWeight="500"
-                            >
-                                {item.exercise}
-                            </Text>
+                            <Stack>
+                                <Text
+                                    fontSize={16}
+                                    color={isDark ? COLORS.textDark : COLORS.text}
+                                    fontWeight="500"
+                                >
+                                    {item.exercise}
+                                </Text>
+                                <Text
+                                    fontSize={14}
+                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                >
+                                    {formatWeight(item.weight)}
+                                </Text>
+                            </Stack>
                             <Badge
-                                label={item.progress}
-                                variant="success"
+                                label={item.change > 0 ? `+${item.change} kg` : item.change < 0 ? `${item.change} kg` : '0 kg'}
+                                variant={item.status}
                             />
                         </Stack>
                     ))}
                 </Stack>
-            </Card>
-
-            {/* Theme Info Card */}
-            <Card
-                title="Orange Theme Active"
-                borderColor={isDark ? COLORS.accentLight : COLORS.accent}
-                backgroundColor={isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary}
-            >
-                <Stack flexDirection="row" alignItems="center" marginBottom={10}>
-                    <Zap size={16} color={isDark ? COLORS.accentLight : COLORS.accent} />
-                    <Text
-                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        marginLeft={8}
-                        fontSize={14}
-                    >
-                        Current theme: {theme.charAt(0).toUpperCase() + theme.slice(1)} mode
-                    </Text>
-                </Stack>
-                <Text
-                    fontSize={14}
-                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                    lineHeight={20}
-                >
-                    This beautiful orange color palette features vibrant oranges, warm ambers,
-                    and complementary teals. Tap the theme toggle in the header to switch themes!
-                </Text>
             </Card>
         </ScrollView>
     );
