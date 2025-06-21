@@ -7,7 +7,7 @@ import { SettingsProvider } from './src/contexts/SettingsContext';
 import { Header } from './src/components/Header';
 import { Footer } from './src/components/Footer';
 import { HomeScreen } from './src/screens/HomeScreen';
-import { ProfileScreen } from './src/screens/ProfileScreen';
+import { StatsScreen } from './src/screens/StatsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { COLORS } from './src/constants/colors';
 
@@ -21,14 +21,14 @@ const AppContent = () => {
 
   const handleNavigate = (screen: Screen) => {
     setCurrentScreen(screen);
-  };  
+  };
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'home':
         return <HomeScreen />;
       case 'profile':
-        return <ProfileScreen />;
+        return <StatsScreen />;
       case 'settings':
         return <SettingsScreen />;
       default:

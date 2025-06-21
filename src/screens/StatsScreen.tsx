@@ -1,14 +1,14 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
-import { TrendingUp, Calendar, Target, Award } from 'lucide-react-native';
+import { TrendingUp, Calendar, Target, History, Dumbbell } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 
-export const ProfileScreen: React.FC = () => {
+export const StatsScreen: React.FC = () => {
     const { resolvedTheme } = useTheme();
     const { formatWeight } = useSettings();
     const isDark = resolvedTheme === 'dark';
@@ -21,8 +21,8 @@ export const ProfileScreen: React.FC = () => {
             color: COLORS.primary
         },
         {
-            title: 'Current Streak',
-            value: '8 days',
+            title: 'Current Cycle',
+            value: 'Cycle 1',
             icon: TrendingUp,
             color: COLORS.success
         },
@@ -33,9 +33,9 @@ export const ProfileScreen: React.FC = () => {
             color: COLORS.warning
         },
         {
-            title: 'Achievements',
-            value: '12',
-            icon: Award,
+            title: 'Training Max',
+            value: formatWeight(180),
+            icon: Dumbbell,
             color: COLORS.error
         },
     ];
@@ -47,11 +47,49 @@ export const ProfileScreen: React.FC = () => {
         { exercise: 'Overhead Press', current: 70, previous: 72, change: -2, status: 'error' as const },
     ];
 
-    const achievements = [
-        { title: 'First Workout', description: 'Completed your first 5/3/1 workout', date: '2 weeks ago' },
-        { title: 'Week Warrior', description: 'Completed 4 workouts in a week', date: '1 week ago' },
-        { title: 'Strength Gains', description: 'Increased all lifts by 5kg+', date: '3 days ago' },
+    const workoutHistory = [
+        {
+            date: 'Today',
+            workout: 'Week 3 - Bench Press',
+            exercises: ['Bench Press 5/3/1+', 'Assistance Work'],
+            status: 'completed' as const
+        },
+        {
+            date: 'Yesterday',
+            workout: 'Week 3 - Squat',
+            exercises: ['Squat 5/3/1+', 'Assistance Work'],
+            status: 'completed' as const
+        },
+        {
+            date: '2 days ago',
+            workout: 'Week 3 - Deadlift',
+            exercises: ['Deadlift 5/3/1+', 'Assistance Work'],
+            status: 'completed' as const
+        },
+        {
+            date: '3 days ago',
+            workout: 'Week 3 - Overhead Press',
+            exercises: ['Overhead Press 5/3/1+', 'Assistance Work'],
+            status: 'completed' as const
+        },
+        {
+            date: '1 week ago',
+            workout: 'Week 2 - Bench Press',
+            exercises: ['Bench Press 3/3/3+', 'Assistance Work'],
+            status: 'completed' as const
+        },
     ];
+
+    const getStatusColor = (status: 'completed' | 'current' | 'upcoming') => {
+        switch (status) {
+            case 'completed':
+                return COLORS.success;
+            case 'current':
+                return COLORS.primary;
+            case 'upcoming':
+                return isDark ? COLORS.textSecondaryDark : COLORS.textSecondary;
+        }
+    };
 
     return (
         <ScrollView style={{ flex: 1, padding: 20 }}>
@@ -152,23 +190,23 @@ export const ProfileScreen: React.FC = () => {
                 </Stack>
             </Card>
 
-            {/* Achievements */}
+            {/* Workout History */}
             <Card
-                title="Achievements"
+                title="Workout History"
                 borderColor={isDark ? COLORS.successLight : COLORS.success}
             >
                 <Stack flexDirection="row" alignItems="center" marginBottom={15}>
-                    <Award size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                    <History size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
                         color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
                         marginLeft={8}
                         fontSize={14}
                     >
-                        Your accomplishments
+                        Recent workouts
                     </Text>
                 </Stack>
                 <Stack gap={12}>
-                    {achievements.map((achievement, index) => (
+                    {workoutHistory.map((workout, index) => (
                         <Stack
                             key={index}
                             style={{
@@ -179,27 +217,35 @@ export const ProfileScreen: React.FC = () => {
                                 borderColor: isDark ? COLORS.borderDark : COLORS.border,
                             }}
                         >
-                            <Text
-                                fontSize={16}
-                                fontWeight="bold"
-                                color={isDark ? COLORS.textDark : COLORS.text}
-                                marginBottom={4}
-                            >
-                                {achievement.title}
-                            </Text>
+                            <Stack flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={4}>
+                                <Text
+                                    fontSize={16}
+                                    fontWeight="bold"
+                                    color={isDark ? COLORS.textDark : COLORS.text}
+                                >
+                                    {workout.workout}
+                                </Text>
+                                <Badge
+                                    label={workout.date}
+                                    variant="complementary"
+                                />
+                            </Stack>
                             <Text
                                 fontSize={14}
                                 color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
                                 marginBottom={4}
                             >
-                                {achievement.description}
+                                {workout.exercises.join(' • ')}
                             </Text>
-                            <Text
-                                fontSize={12}
-                                color={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
-                            >
-                                {achievement.date}
-                            </Text>
+                            <Stack flexDirection="row" alignItems="center">
+                                <Text
+                                    fontSize={12}
+                                    color={getStatusColor(workout.status)}
+                                    fontWeight="500"
+                                >
+                                    ✓ Completed
+                                </Text>
+                            </Stack>
                         </Stack>
                     ))}
                 </Stack>

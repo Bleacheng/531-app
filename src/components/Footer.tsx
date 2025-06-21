@@ -23,7 +23,7 @@ export const Footer: React.FC<FooterProps> = ({ currentScreen, onNavigate }) => 
         {
             key: 'profile' as const,
             icon: BarChart3,
-            label: 'Stats',
+            label: 'History',
             isActive: currentScreen === 'profile'
         },
         {
