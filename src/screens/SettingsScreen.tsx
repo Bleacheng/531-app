@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
-import { Palette, Scale, Calendar } from 'lucide-react-native';
+import { Palette, Scale, Calendar, TrendingUp } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,7 +10,7 @@ import { COLORS } from '../constants/colors';
 
 export const SettingsScreen: React.FC = () => {
     const { theme, setTheme, resolvedTheme } = useTheme();
-    const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay } = useSettings();
+    const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay, exerciseProgression, updateExerciseProgression } = useSettings();
     const isDark = resolvedTheme === 'dark';
 
     const themeOptions = [
@@ -27,6 +27,8 @@ export const SettingsScreen: React.FC = () => {
     const dayOptions = [
         'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
     ];
+
+    const progressionOptions = [1, 1.25, 2.5, 5, 7.5, 10];
 
     const exerciseNames = {
         benchPress: 'Bench Press',
@@ -147,7 +149,46 @@ export const SettingsScreen: React.FC = () => {
                                         title={day}
                                         onPress={() => updateWorkoutDay(key as keyof typeof workoutSchedule, day)}
                                         variant={workoutSchedule[key as keyof typeof workoutSchedule] === day ? 'primary' : 'outline'}
-                                        style={{ minWidth: 80 }}
+                                    />
+                                ))}
+                            </Stack>
+                        </Stack>
+                    ))}
+                </Stack>
+            </Card>
+
+            {/* Exercise Progression Settings */}
+            <Card
+                title="Exercise Progression"
+                borderColor={isDark ? COLORS.warningLight : COLORS.warning}
+            >
+                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                    <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                    <Text
+                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                        marginLeft={8}
+                        fontSize={14}
+                    >
+                        Set weight progression per cycle
+                    </Text>
+                </Stack>
+                <Stack gap={12}>
+                    {Object.entries(exerciseNames).map(([key, name]) => (
+                        <Stack key={key} gap={8}>
+                            <Text
+                                fontSize={16}
+                                fontWeight="600"
+                                color={isDark ? COLORS.textDark : COLORS.text}
+                            >
+                                {name}
+                            </Text>
+                            <Stack flexDirection="row" flexWrap="wrap" gap={6}>
+                                {progressionOptions.map((progression) => (
+                                    <Button
+                                        key={progression}
+                                        title={`${progression} ${unit}`}
+                                        onPress={() => updateExerciseProgression(key as keyof typeof exerciseProgression, progression)}
+                                        variant={exerciseProgression[key as keyof typeof exerciseProgression] === progression ? 'primary' : 'outline'}
                                     />
                                 ))}
                             </Stack>
@@ -215,6 +256,32 @@ export const SettingsScreen: React.FC = () => {
                                     fontWeight="500"
                                 >
                                     {workoutSchedule[key as keyof typeof workoutSchedule]}
+                                </Text>
+                            </Stack>
+                        ))}
+                    </Stack>
+                    <Stack gap={8}>
+                        <Text
+                            fontSize={16}
+                            color={isDark ? COLORS.textDark : COLORS.text}
+                            fontWeight="500"
+                        >
+                            Progression
+                        </Text>
+                        {Object.entries(exerciseNames).map(([key, name]) => (
+                            <Stack key={key} flexDirection="row" justifyContent="space-between" alignItems="center">
+                                <Text
+                                    fontSize={14}
+                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                >
+                                    {name}
+                                </Text>
+                                <Text
+                                    fontSize={14}
+                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                    fontWeight="500"
+                                >
+                                    +{exerciseProgression[key as keyof typeof exerciseProgression]} {unit}
                                 </Text>
                             </Stack>
                         ))}

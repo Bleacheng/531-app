@@ -11,13 +11,29 @@ import { COLORS } from '../constants/colors';
 
 export const HomeScreen: React.FC = () => {
     const { resolvedTheme } = useTheme();
-    const { formatWeight, workoutSchedule } = useSettings();
+    const { formatWeight, workoutSchedule, exerciseProgression } = useSettings();
     const isDark = resolvedTheme === 'dark';
 
     const handleStartWorkout = (exercise: string) => {
         console.log(`Start ${exercise} workout pressed`);
         // TODO: Navigate to workout screen
     };
+
+    // Helper function to calculate workout weight based on progression
+    const calculateWorkoutWeight = (exercise: string, baseWeight: number, cycle: number) => {
+        const progressionMap: { [key: string]: number } = {
+            'Bench Press': exerciseProgression.benchPress,
+            'Squat': exerciseProgression.squat,
+            'Deadlift': exerciseProgression.deadlift,
+            'Overhead Press': exerciseProgression.overheadPress,
+        };
+
+        const progression = progressionMap[exercise] || 2.5;
+        return baseWeight + (progression * (cycle - 1));
+    };
+
+    // Example usage:
+    // const benchWeight = calculateWorkoutWeight('Bench Press', 80, 3); // 80 + (2.5 * 2) = 85kg
 
     // Get current week's start date (Monday)
     const getWeekStart = () => {
