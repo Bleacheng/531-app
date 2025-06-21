@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
-import { Palette, Scale } from 'lucide-react-native';
+import { Palette, Scale, Calendar } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,7 +10,7 @@ import { COLORS } from '../constants/colors';
 
 export const SettingsScreen: React.FC = () => {
     const { theme, setTheme, resolvedTheme } = useTheme();
-    const { unit, setUnit, formatWeight } = useSettings();
+    const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay } = useSettings();
     const isDark = resolvedTheme === 'dark';
 
     const themeOptions = [
@@ -24,8 +24,19 @@ export const SettingsScreen: React.FC = () => {
         { value: 'lbs' as const, label: 'Pounds (lbs)', description: 'Imperial system' },
     ];
 
+    const dayOptions = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    ];
+
+    const exerciseNames = {
+        benchPress: 'Bench Press',
+        squat: 'Squat',
+        deadlift: 'Deadlift',
+        overheadPress: 'Overhead Press'
+    };
+
     return (
-        <ScrollView style={{ flex: 1, padding: 20 }}>
+        <ScrollView style={{ flex: 1, padding: 20, paddingTop: 40, paddingBottom: 40 }}>
             {/* Header */}
             <Stack marginBottom={20}>
                 <Text
@@ -104,6 +115,47 @@ export const SettingsScreen: React.FC = () => {
                 </Stack>
             </Card>
 
+            {/* Workout Schedule Settings */}
+            <Card
+                title="Workout Schedule"
+                borderColor={isDark ? COLORS.successLight : COLORS.success}
+            >
+                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                    <Calendar size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                    <Text
+                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                        marginLeft={8}
+                        fontSize={14}
+                    >
+                        Set your weekly workout days
+                    </Text>
+                </Stack>
+                <Stack gap={12}>
+                    {Object.entries(exerciseNames).map(([key, name]) => (
+                        <Stack key={key} gap={8}>
+                            <Text
+                                fontSize={16}
+                                fontWeight="600"
+                                color={isDark ? COLORS.textDark : COLORS.text}
+                            >
+                                {name}
+                            </Text>
+                            <Stack flexDirection="row" flexWrap="wrap" gap={6}>
+                                {dayOptions.map((day) => (
+                                    <Button
+                                        key={day}
+                                        title={day}
+                                        onPress={() => updateWorkoutDay(key as keyof typeof workoutSchedule, day)}
+                                        variant={workoutSchedule[key as keyof typeof workoutSchedule] === day ? 'primary' : 'outline'}
+                                        style={{ minWidth: 80 }}
+                                    />
+                                ))}
+                            </Stack>
+                        </Stack>
+                    ))}
+                </Stack>
+            </Card>
+
             {/* Current Settings Summary */}
             <Card
                 title="Current Settings"
@@ -140,6 +192,32 @@ export const SettingsScreen: React.FC = () => {
                         >
                             {unitOptions.find(opt => opt.value === unit)?.label}
                         </Text>
+                    </Stack>
+                    <Stack gap={8}>
+                        <Text
+                            fontSize={16}
+                            color={isDark ? COLORS.textDark : COLORS.text}
+                            fontWeight="500"
+                        >
+                            Workout Schedule
+                        </Text>
+                        {Object.entries(exerciseNames).map(([key, name]) => (
+                            <Stack key={key} flexDirection="row" justifyContent="space-between" alignItems="center">
+                                <Text
+                                    fontSize={14}
+                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                >
+                                    {name}
+                                </Text>
+                                <Text
+                                    fontSize={14}
+                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                    fontWeight="500"
+                                >
+                                    {workoutSchedule[key as keyof typeof workoutSchedule]}
+                                </Text>
+                            </Stack>
+                        ))}
                     </Stack>
                 </Stack>
             </Card>

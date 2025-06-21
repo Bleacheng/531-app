@@ -8,7 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 
-export const StatsScreen: React.FC = () => {
+export const HistoryScreen: React.FC = () => {
     const { resolvedTheme } = useTheme();
     const { formatWeight } = useSettings();
     const isDark = resolvedTheme === 'dark';
@@ -92,7 +92,7 @@ export const StatsScreen: React.FC = () => {
     };
 
     return (
-        <ScrollView style={{ flex: 1, padding: 20 }}>
+        <ScrollView style={{ flex: 1, padding: 20, paddingTop: 40, paddingBottom: 40 }}>
             {/* Profile Header */}
             <Card
                 title="Your Progress"

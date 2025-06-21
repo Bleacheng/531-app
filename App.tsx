@@ -7,7 +7,7 @@ import { SettingsProvider } from './src/contexts/SettingsContext';
 import { Header } from './src/components/Header';
 import { Footer } from './src/components/Footer';
 import { HomeScreen } from './src/screens/HomeScreen';
-import { StatsScreen } from './src/screens/StatsScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { COLORS } from './src/constants/colors';
 
@@ -28,7 +28,7 @@ const AppContent = () => {
       case 'home':
         return <HomeScreen />;
       case 'profile':
-        return <StatsScreen />;
+        return <HistoryScreen />;
       case 'settings':
         return <SettingsScreen />;
       default:
@@ -44,7 +44,7 @@ const AppContent = () => {
       {currentScreen === 'home' && (
         <Header
           title="531 App"
-          subtitle="Your strength training companion"
+          subtitle="Uh vro can i get uuuuuh"
         />
       )}
       <View flex={1}>
