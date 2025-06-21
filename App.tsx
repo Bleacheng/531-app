@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { TamaguiProvider, View } from '@tamagui/core';
 import { useState } from 'react';
+import { SafeAreaView } from 'react-native';
 import tamaguiConfig from './tamagui.config';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { SettingsProvider } from './src/contexts/SettingsContext';
@@ -37,9 +38,11 @@ const AppContent = () => {
   };
 
   return (
-    <View
-      flex={1}
-      backgroundColor={isDark ? COLORS.backgroundDark : COLORS.background}
+    <SafeAreaView
+      style={{
+        flex: 1,
+        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+      }}
     >
       {currentScreen === 'home' && (
         <Header
@@ -55,7 +58,7 @@ const AppContent = () => {
         onNavigate={handleNavigate}
       />
       <StatusBar style={isDark ? "light" : "dark"} />
-    </View>
+    </SafeAreaView>
   );
 };
 

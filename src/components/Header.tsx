@@ -17,13 +17,13 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
     const getThemeIcon = () => {
         switch (theme) {
             case 'system':
-                return isDark ? '☀️' : '🌙';
+                return isDark ? <Sun size={20} color="white" /> : <Moon size={20} color="white" />;
             case 'light':
-                return '🌙';
+                return <Moon size={20} color="white" />;
             case 'dark':
-                return '☀️';
+                return <Sun size={20} color="white" />;
             default:
-                return '🌙';
+                return <Moon size={20} color="white" />;
         }
     };
 
@@ -83,13 +83,7 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                         elevation: 4,
                     }}
                 >
-                    <Text
-                        color="white"
-                        fontSize={16}
-                        fontWeight="bold"
-                    >
-                        {getThemeIcon()}
-                    </Text>
+                    {getThemeIcon()}
                 </TouchableOpacity>
             </Stack>
         </View>

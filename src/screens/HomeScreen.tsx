@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { ScrollView } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
 import { Calendar, CheckCircle, Circle, TrendingUp, X } from 'lucide-react-native';
@@ -11,8 +11,17 @@ import { COLORS } from '../constants/colors';
 
 export const HomeScreen: React.FC = () => {
     const { resolvedTheme } = useTheme();
-    const { formatWeight, workoutSchedule, exerciseProgression } = useSettings();
+    const { formatWeight, workoutSchedule, exerciseProgression, saveScrollPosition, getScrollPosition } = useSettings();
     const isDark = resolvedTheme === 'dark';
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    // Restore scroll position when component mounts
+    useEffect(() => {
+        const savedPosition = getScrollPosition('home');
+        if (savedPosition > 0) {
+            scrollViewRef.current?.scrollTo({ y: savedPosition, animated: false });
+        }
+    }, []);
 
     const handleStartWorkout = (exercise: string) => {
         console.log(`Start ${exercise} workout pressed`);
@@ -203,7 +212,15 @@ export const HomeScreen: React.FC = () => {
     );
 
     return (
-        <ScrollView style={{ flex: 1, padding: 20, paddingTop: 40, paddingBottom: 40 }}>
+        <ScrollView
+            ref={scrollViewRef}
+            style={{ flex: 1, padding: 20 }}
+            onScroll={(event) => {
+                const offsetY = event.nativeEvent.contentOffset.y;
+                saveScrollPosition('home', offsetY);
+            }}
+            scrollEventThrottle={16}
+        >
             {/* Week Plan */}
             <Card
                 title="Week Plan"

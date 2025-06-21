@@ -17,6 +17,12 @@ interface ExerciseProgression {
     overheadPress: number;
 }
 
+interface ScrollPositions {
+    home: number;
+    history: number;
+    settings: number;
+}
+
 interface SettingsContextType {
     unit: Unit;
     setUnit: (unit: Unit) => void;
@@ -28,6 +34,9 @@ interface SettingsContextType {
     exerciseProgression: ExerciseProgression;
     setExerciseProgression: (progression: ExerciseProgression) => void;
     updateExerciseProgression: (exercise: keyof ExerciseProgression, progression: number) => void;
+    scrollPositions: ScrollPositions;
+    saveScrollPosition: (screen: keyof ScrollPositions, position: number) => void;
+    getScrollPosition: (screen: keyof ScrollPositions) => number;
     isLoading: boolean;
 }
 
@@ -43,6 +52,12 @@ const defaultProgression: ExerciseProgression = {
     squat: 5,
     deadlift: 5,
     overheadPress: 2.5,
+};
+
+const defaultScrollPositions: ScrollPositions = {
+    home: 0,
+    history: 0,
+    settings: 0,
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -63,6 +78,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const [unit, setUnit] = useState<Unit>('kg');
     const [workoutSchedule, setWorkoutSchedule] = useState<WorkoutSchedule>(defaultSchedule);
     const [exerciseProgression, setExerciseProgression] = useState<ExerciseProgression>(defaultProgression);
+    const [scrollPositions, setScrollPositions] = useState<ScrollPositions>(defaultScrollPositions);
     const [isLoading, setIsLoading] = useState(true);
 
     // Load settings from AsyncStorage on app start
@@ -72,10 +88,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, scrollData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
+                AsyncStorage.getItem('settings_scrollPositions'),
             ]);
 
             if (unitData) {
@@ -86,6 +103,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (progressionData) {
                 setExerciseProgression(JSON.parse(progressionData));
+            }
+            if (scrollData) {
+                setScrollPositions(JSON.parse(scrollData));
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -124,6 +144,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
     };
 
+    // Save scroll positions
+    const saveScrollPositions = async (positions: ScrollPositions) => {
+        try {
+            await AsyncStorage.setItem('settings_scrollPositions', JSON.stringify(positions));
+            setScrollPositions(positions);
+        } catch (error) {
+            console.error('Error saving scroll positions:', error);
+        }
+    };
+
     const toggleUnit = () => {
         const newUnit = unit === 'kg' ? 'lbs' : 'kg';
         saveUnit(newUnit);
@@ -140,11 +170,27 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     };
 
     const updateWorkoutDay = (exercise: keyof WorkoutSchedule, day: string) => {
-        const newSchedule = {
-            ...workoutSchedule,
-            [exercise]: day
-        };
-        saveWorkoutSchedule(newSchedule);
+        // Check if another exercise is already scheduled for this day
+        const conflictingExercise = Object.entries(workoutSchedule).find(
+            ([key, scheduledDay]) => key !== exercise && scheduledDay === day
+        );
+
+        if (conflictingExercise) {
+            // Move the conflicting exercise to the day that was previously occupied by the current exercise
+            const currentExerciseDay = workoutSchedule[exercise];
+            const newSchedule = {
+                ...workoutSchedule,
+                [exercise]: day,
+                [conflictingExercise[0]]: currentExerciseDay
+            };
+            saveWorkoutSchedule(newSchedule);
+        } else {
+            const newSchedule = {
+                ...workoutSchedule,
+                [exercise]: day
+            };
+            saveWorkoutSchedule(newSchedule);
+        }
     };
 
     const updateExerciseProgression = (exercise: keyof ExerciseProgression, progression: number) => {
@@ -153,6 +199,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             [exercise]: progression
         };
         saveExerciseProgression(newProgression);
+    };
+
+    const saveScrollPosition = (screen: keyof ScrollPositions, position: number) => {
+        const newPositions = {
+            ...scrollPositions,
+            [screen]: position
+        };
+        saveScrollPositions(newPositions);
+    };
+
+    const getScrollPosition = (screen: keyof ScrollPositions): number => {
+        return scrollPositions[screen];
     };
 
     const value = {
@@ -166,6 +224,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         exerciseProgression,
         setExerciseProgression: saveExerciseProgression,
         updateExerciseProgression,
+        scrollPositions,
+        saveScrollPosition,
+        getScrollPosition,
         isLoading,
     };
 

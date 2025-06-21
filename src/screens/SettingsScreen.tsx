@@ -1,7 +1,7 @@
-import React from 'react';
-import { ScrollView } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { ScrollView, TextInput } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
-import { Palette, Scale, Calendar, TrendingUp } from 'lucide-react-native';
+import { Palette, Scale, Calendar, TrendingUp, GripVertical } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,8 +10,25 @@ import { COLORS } from '../constants/colors';
 
 export const SettingsScreen: React.FC = () => {
     const { theme, setTheme, resolvedTheme } = useTheme();
-    const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay, exerciseProgression, updateExerciseProgression } = useSettings();
+    const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay, exerciseProgression, updateExerciseProgression, saveScrollPosition, getScrollPosition } = useSettings();
     const isDark = resolvedTheme === 'dark';
+    const scrollViewRef = useRef<ScrollView>(null);
+
+    // Local state for text inputs
+    const [progressionInputs, setProgressionInputs] = useState({
+        benchPress: exerciseProgression.benchPress.toString(),
+        squat: exerciseProgression.squat.toString(),
+        deadlift: exerciseProgression.deadlift.toString(),
+        overheadPress: exerciseProgression.overheadPress.toString(),
+    });
+
+    // Restore scroll position when component mounts
+    useEffect(() => {
+        const savedPosition = getScrollPosition('settings');
+        if (savedPosition > 0) {
+            scrollViewRef.current?.scrollTo({ y: savedPosition, animated: false });
+        }
+    }, []);
 
     const themeOptions = [
         { value: 'system' as const, label: 'System', description: 'Follow device settings' },
@@ -28,8 +45,6 @@ export const SettingsScreen: React.FC = () => {
         'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
     ];
 
-    const progressionOptions = [1, 1.25, 2.5, 5, 7.5, 10];
-
     const exerciseNames = {
         benchPress: 'Bench Press',
         squat: 'Squat',
@@ -37,8 +52,38 @@ export const SettingsScreen: React.FC = () => {
         overheadPress: 'Overhead Press'
     };
 
+    const handleProgressionChange = (exercise: keyof typeof exerciseProgression, value: string) => {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0) {
+            updateExerciseProgression(exercise, numValue);
+        }
+        setProgressionInputs(prev => ({
+            ...prev,
+            [exercise]: value
+        }));
+    };
+
+    const handleProgressionBlur = (exercise: keyof typeof exerciseProgression) => {
+        const numValue = parseFloat(progressionInputs[exercise]);
+        if (isNaN(numValue) || numValue <= 0) {
+            // Reset to current value if invalid
+            setProgressionInputs(prev => ({
+                ...prev,
+                [exercise]: exerciseProgression[exercise].toString()
+            }));
+        }
+    };
+
     return (
-        <ScrollView style={{ flex: 1, padding: 20, paddingTop: 40, paddingBottom: 40 }}>
+        <ScrollView
+            ref={scrollViewRef}
+            style={{ flex: 1, padding: 20 }}
+            onScroll={(event) => {
+                const offsetY = event.nativeEvent.contentOffset.y;
+                saveScrollPosition('settings', offsetY);
+            }}
+            scrollEventThrottle={16}
+        >
             {/* Header */}
             <Stack marginBottom={20}>
                 <Text
@@ -117,7 +162,7 @@ export const SettingsScreen: React.FC = () => {
                 </Stack>
             </Card>
 
-            {/* Workout Schedule Settings */}
+            {/* Draggable Workout Schedule */}
             <Card
                 title="Workout Schedule"
                 borderColor={isDark ? COLORS.successLight : COLORS.success}
@@ -129,31 +174,61 @@ export const SettingsScreen: React.FC = () => {
                         marginLeft={8}
                         fontSize={14}
                     >
-                        Set your weekly workout days
+                        Drag exercises to schedule your week
                     </Text>
                 </Stack>
-                <Stack gap={12}>
-                    {Object.entries(exerciseNames).map(([key, name]) => (
-                        <Stack key={key} gap={8}>
-                            <Text
-                                fontSize={16}
-                                fontWeight="600"
-                                color={isDark ? COLORS.textDark : COLORS.text}
+
+                {/* Weekly Schedule Grid */}
+                <Stack gap={8}>
+                    {dayOptions.map((day) => {
+                        const exerciseForDay = Object.entries(workoutSchedule).find(([key, scheduledDay]) => scheduledDay === day);
+                        const isDayOccupied = !!exerciseForDay;
+
+                        return (
+                            <Stack
+                                key={day}
+                                style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                    minHeight: 50,
+                                    justifyContent: 'center',
+                                }}
                             >
-                                {name}
-                            </Text>
-                            <Stack flexDirection="row" flexWrap="wrap" gap={6}>
-                                {dayOptions.map((day) => (
-                                    <Button
-                                        key={day}
-                                        title={day}
-                                        onPress={() => updateWorkoutDay(key as keyof typeof workoutSchedule, day)}
-                                        variant={workoutSchedule[key as keyof typeof workoutSchedule] === day ? 'primary' : 'outline'}
-                                    />
-                                ))}
+                                <Stack flexDirection="row" alignItems="center" justifyContent="space-between">
+                                    <Text
+                                        fontSize={16}
+                                        fontWeight="600"
+                                        color={isDark ? COLORS.textDark : COLORS.text}
+                                    >
+                                        {day}
+                                    </Text>
+                                    {isDayOccupied ? (
+                                        <Stack flexDirection="row" alignItems="center" gap={8}>
+                                            <GripVertical size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                            <Text
+                                                fontSize={14}
+                                                color={isDark ? COLORS.primary : COLORS.primaryLight}
+                                                fontWeight="500"
+                                            >
+                                                {exerciseNames[exerciseForDay[0] as keyof typeof exerciseNames]}
+                                            </Text>
+                                        </Stack>
+                                    ) : (
+                                        <Text
+                                            fontSize={14}
+                                            color={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                            fontStyle="italic"
+                                        >
+                                            Rest day
+                                        </Text>
+                                    )}
+                                </Stack>
                             </Stack>
-                        </Stack>
-                    ))}
+                        );
+                    })}
                 </Stack>
             </Card>
 
@@ -182,110 +257,34 @@ export const SettingsScreen: React.FC = () => {
                             >
                                 {name}
                             </Text>
-                            <Stack flexDirection="row" flexWrap="wrap" gap={6}>
-                                {progressionOptions.map((progression) => (
-                                    <Button
-                                        key={progression}
-                                        title={`${progression} ${unit}`}
-                                        onPress={() => updateExerciseProgression(key as keyof typeof exerciseProgression, progression)}
-                                        variant={exerciseProgression[key as keyof typeof exerciseProgression] === progression ? 'primary' : 'outline'}
-                                    />
-                                ))}
+                            <Stack flexDirection="row" alignItems="center" gap={8}>
+                                <Text
+                                    fontSize={14}
+                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                >
+                                    +{unit}
+                                </Text>
+                                <TextInput
+                                    value={progressionInputs[key as keyof typeof progressionInputs]}
+                                    onChangeText={(value) => handleProgressionChange(key as keyof typeof exerciseProgression, value)}
+                                    onBlur={() => handleProgressionBlur(key as keyof typeof exerciseProgression)}
+                                    keyboardType="numeric"
+                                    style={{
+                                        flex: 1,
+                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                        borderWidth: 1,
+                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                        borderRadius: 8,
+                                        padding: 12,
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        fontSize: 16,
+                                    }}
+                                    placeholder="2.5"
+                                    placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                />
                             </Stack>
                         </Stack>
                     ))}
-                </Stack>
-            </Card>
-
-            {/* Current Settings Summary */}
-            <Card
-                title="Current Settings"
-                borderColor={isDark ? COLORS.accentLight : COLORS.accent}
-                backgroundColor={isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary}
-            >
-                <Stack gap={12}>
-                    <Stack flexDirection="row" justifyContent="space-between" alignItems="center">
-                        <Text
-                            fontSize={16}
-                            color={isDark ? COLORS.textDark : COLORS.text}
-                            fontWeight="500"
-                        >
-                            Theme
-                        </Text>
-                        <Text
-                            fontSize={16}
-                            color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        >
-                            {themeOptions.find(opt => opt.value === theme)?.label}
-                        </Text>
-                    </Stack>
-                    <Stack flexDirection="row" justifyContent="space-between" alignItems="center">
-                        <Text
-                            fontSize={16}
-                            color={isDark ? COLORS.textDark : COLORS.text}
-                            fontWeight="500"
-                        >
-                            Units
-                        </Text>
-                        <Text
-                            fontSize={16}
-                            color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        >
-                            {unitOptions.find(opt => opt.value === unit)?.label}
-                        </Text>
-                    </Stack>
-                    <Stack gap={8}>
-                        <Text
-                            fontSize={16}
-                            color={isDark ? COLORS.textDark : COLORS.text}
-                            fontWeight="500"
-                        >
-                            Workout Schedule
-                        </Text>
-                        {Object.entries(exerciseNames).map(([key, name]) => (
-                            <Stack key={key} flexDirection="row" justifyContent="space-between" alignItems="center">
-                                <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                >
-                                    {name}
-                                </Text>
-                                <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                    fontWeight="500"
-                                >
-                                    {workoutSchedule[key as keyof typeof workoutSchedule]}
-                                </Text>
-                            </Stack>
-                        ))}
-                    </Stack>
-                    <Stack gap={8}>
-                        <Text
-                            fontSize={16}
-                            color={isDark ? COLORS.textDark : COLORS.text}
-                            fontWeight="500"
-                        >
-                            Progression
-                        </Text>
-                        {Object.entries(exerciseNames).map(([key, name]) => (
-                            <Stack key={key} flexDirection="row" justifyContent="space-between" alignItems="center">
-                                <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                >
-                                    {name}
-                                </Text>
-                                <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                    fontWeight="500"
-                                >
-                                    +{exerciseProgression[key as keyof typeof exerciseProgression]} {unit}
-                                </Text>
-                            </Stack>
-                        ))}
-                    </Stack>
                 </Stack>
             </Card>
         </ScrollView>
