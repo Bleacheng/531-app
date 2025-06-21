@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { TamaguiProvider, View } from '@tamagui/core';
 import { useState } from 'react';
 import { SafeAreaView } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import tamaguiConfig from './tamagui.config';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { SettingsProvider } from './src/contexts/SettingsContext';
@@ -64,12 +65,14 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <TamaguiProvider config={tamaguiConfig}>
-      <ThemeProvider>
-        <SettingsProvider>
-          <AppContent />
-        </SettingsProvider>
-      </ThemeProvider>
-    </TamaguiProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <TamaguiProvider config={tamaguiConfig}>
+        <ThemeProvider>
+          <SettingsProvider>
+            <AppContent />
+          </SettingsProvider>
+        </ThemeProvider>
+      </TamaguiProvider>
+    </GestureHandlerRootView>
   );
 }

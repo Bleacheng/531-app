@@ -31,6 +31,7 @@ interface SettingsContextType {
     workoutSchedule: WorkoutSchedule;
     setWorkoutSchedule: (schedule: WorkoutSchedule) => void;
     updateWorkoutDay: (exercise: keyof WorkoutSchedule, day: string) => void;
+    updateWorkoutScheduleBulk: (schedule: WorkoutSchedule) => void;
     exerciseProgression: ExerciseProgression;
     setExerciseProgression: (progression: ExerciseProgression) => void;
     updateExerciseProgression: (exercise: keyof ExerciseProgression, progression: number) => void;
@@ -193,6 +194,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
     };
 
+    const updateWorkoutScheduleBulk = (newSchedule: WorkoutSchedule) => {
+        // Direct bulk update without conflict resolution for drag and drop
+        saveWorkoutSchedule(newSchedule);
+    };
+
     const updateExerciseProgression = (exercise: keyof ExerciseProgression, progression: number) => {
         const newProgression = {
             ...exerciseProgression,
@@ -221,6 +227,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         workoutSchedule,
         setWorkoutSchedule: saveWorkoutSchedule,
         updateWorkoutDay,
+        updateWorkoutScheduleBulk,
         exerciseProgression,
         setExerciseProgression: saveExerciseProgression,
         updateExerciseProgression,

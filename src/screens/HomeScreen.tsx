@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import { ScrollView } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
 import { Calendar, CheckCircle, Circle, TrendingUp, X } from 'lucide-react-native';
@@ -70,8 +70,11 @@ export const HomeScreen: React.FC = () => {
         return dayMap[day] || 0;
     };
 
+    // Memoize today's date to prevent recalculation on every render
+    const today = useMemo(() => new Date(), []);
+
     // This week's workouts (Week 3 - 5/3/1+)
-    const thisWeeksWorkouts = [
+    const thisWeeksWorkouts = useMemo(() => [
         {
             lift: 'Bench Press',
             topSet: '5/3/1+',
@@ -104,7 +107,25 @@ export const HomeScreen: React.FC = () => {
             date: new Date(weekStart.getTime() + getDayOffset(workoutSchedule.overheadPress) * 24 * 60 * 60 * 1000),
             completed: false
         },
-    ];
+    ], [workoutSchedule, weekStart]);
+
+    // Memoize today's workout to prevent recalculation
+    const todaysWorkout = useMemo(() => {
+        return thisWeeksWorkouts.find(workout =>
+            workout.date.toDateString() === today.toDateString()
+        );
+    }, [thisWeeksWorkouts, today]);
+
+    // Memoize completed and upcoming workouts
+    const completedWorkouts = useMemo(() =>
+        thisWeeksWorkouts.filter(workout => workout.completed),
+        [thisWeeksWorkouts]
+    );
+
+    const upcomingWorkouts = useMemo(() =>
+        thisWeeksWorkouts.filter(workout => !workout.completed),
+        [thisWeeksWorkouts]
+    );
 
     // 5/3/1 4-week cycle overview with completed lifts and pass/fail status
     const cycleOverview = [
@@ -187,8 +208,8 @@ export const HomeScreen: React.FC = () => {
             <X size={12} color={COLORS.error} />;
     };
 
+    // Memoize formatDate function to prevent recalculation
     const formatDate = (date: Date) => {
-        const today = new Date();
         const diffTime = Math.abs(today.getTime() - date.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -201,15 +222,6 @@ export const HomeScreen: React.FC = () => {
             day: 'numeric'
         });
     };
-
-    const completedWorkouts = thisWeeksWorkouts.filter(workout => workout.completed);
-    const upcomingWorkouts = thisWeeksWorkouts.filter(workout => !workout.completed);
-
-    // Get today's workout
-    const today = new Date();
-    const todaysWorkout = thisWeeksWorkouts.find(workout =>
-        workout.date.toDateString() === today.toDateString()
-    );
 
     return (
         <ScrollView
