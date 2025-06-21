@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Settings, BarChart3, Home } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
@@ -36,10 +35,9 @@ export const Footer: React.FC<FooterProps> = ({ currentScreen, onNavigate }) => 
     ];
 
     return (
-        <BlurView
-            intensity={isDark ? 20 : 30}
-            tint={isDark ? 'dark' : 'light'}
+        <View
             style={{
+                backgroundColor: isDark ? COLORS.backgroundSecondaryDark : COLORS.backgroundSecondary,
                 borderTopWidth: 1,
                 borderTopColor: isDark ? COLORS.borderDark : COLORS.border,
                 paddingVertical: 12,
@@ -52,9 +50,6 @@ export const Footer: React.FC<FooterProps> = ({ currentScreen, onNavigate }) => 
                 shadowOpacity: 0.1,
                 shadowRadius: 4,
                 elevation: 8,
-                backgroundColor: isDark
-                    ? `${COLORS.backgroundSecondaryDark}80`
-                    : `${COLORS.backgroundSecondary}80`,
             }}
         >
             {navItems.map((item) => {
@@ -97,6 +92,6 @@ export const Footer: React.FC<FooterProps> = ({ currentScreen, onNavigate }) => 
                     </TouchableOpacity>
                 );
             })}
-        </BlurView>
+        </View>
     );
 }; 
