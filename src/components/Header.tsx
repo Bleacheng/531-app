@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
-import { Appbar, Text } from 'react-native-paper';
+import { View, TouchableOpacity, Text } from 'react-native';
 import { Dumbbell, Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
@@ -11,16 +10,37 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
-    const { resolvedTheme, toggleTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const { theme, toggleTheme } = useTheme();
+    const isDark = theme === 'dark';
 
     return (
-        <Appbar.Header style={{ backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background }}>
+        <View style={{
+            backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+            paddingHorizontal: 20,
+            paddingTop: 50,
+            paddingBottom: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderBottomWidth: 1,
+            borderBottomColor: isDark ? COLORS.borderDark : COLORS.border,
+        }}>
             <Dumbbell size={28} color={isDark ? COLORS.primaryLight : COLORS.primaryDark} style={{ marginRight: 12 }} />
-            <Appbar.Content
-                title={<Text variant="titleLarge" style={{ color: isDark ? COLORS.textDark : COLORS.text }}>{title}</Text>}
-                subtitle={<Text variant="bodyMedium" style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>{subtitle}</Text>}
-            />
+            <View style={{ flex: 1 }}>
+                <Text style={{
+                    color: isDark ? COLORS.textDark : COLORS.text,
+                    fontSize: 20,
+                    fontWeight: 'bold'
+                }}>
+                    {title}
+                </Text>
+                <Text style={{
+                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                    fontSize: 14,
+                    marginTop: 2
+                }}>
+                    {subtitle}
+                </Text>
+            </View>
             <TouchableOpacity onPress={toggleTheme} style={{ marginRight: 12 }}>
                 {isDark ? (
                     <Sun size={22} color={COLORS.accent} />
@@ -28,6 +48,6 @@ export const Header: React.FC<HeaderProps> = ({ title, subtitle }) => {
                     <Moon size={22} color={COLORS.accentDark} />
                 )}
             </TouchableOpacity>
-        </Appbar.Header>
+        </View>
     );
 }; 

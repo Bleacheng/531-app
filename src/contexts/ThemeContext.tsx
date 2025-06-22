@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { AppState, AppStateStatus, Appearance, ColorSchemeName } from 'react-native';
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
     theme: Theme;
-    resolvedTheme: 'light' | 'dark';
     toggleTheme: () => void;
     setTheme: (theme: Theme) => void;
 }
@@ -25,28 +24,21 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-    const systemColorScheme = useColorScheme();
-    const [theme, setTheme] = useState<Theme>('system');
+    const [theme, setTheme] = useState<Theme>('light');
 
-    // Calculate resolved theme based on current setting
-    const resolvedTheme = React.useMemo(() => {
-        if (theme === 'system') {
-            return systemColorScheme || 'light';
-        }
-        return theme;
-    }, [theme, systemColorScheme]);
+    // Initialize theme to current system theme on app launch
+    useEffect(() => {
+        const currentSystemTheme = Appearance.getColorScheme() || 'light';
+        setTheme(currentSystemTheme);
+    }, []);
 
+    // Toggle between light and dark
     const toggleTheme = () => {
-        setTheme(prev => {
-            if (prev === 'light') return 'dark';
-            if (prev === 'dark') return 'system';
-            return 'light';
-        });
+        setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
 
     const value = {
         theme,
-        resolvedTheme,
         toggleTheme,
         setTheme,
     };

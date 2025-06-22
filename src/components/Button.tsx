@@ -27,8 +27,8 @@ export const Button: React.FC<ButtonProps> = ({
     style,
     textStyle,
 }) => {
-    const { resolvedTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
 
     const getButtonStyles = () => {
         let baseStyles: any = {

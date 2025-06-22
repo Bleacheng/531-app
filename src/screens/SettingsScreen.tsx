@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TextInput, TouchableOpacity, ScrollView, Alert, View } from 'react-native';
+import { TextInput, TouchableOpacity, ScrollView, Alert, View, Text } from 'react-native';
 import Modal from 'react-native-modal';
-import { Text } from 'react-native-paper';
 import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle, CheckCircle, X } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -11,9 +10,9 @@ import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 
 export const SettingsScreen: React.FC = () => {
-    const { theme, setTheme, resolvedTheme } = useTheme();
+    const { theme, setTheme } = useTheme();
     const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay, exerciseProgression, updateExerciseProgression, saveScrollPosition, getScrollPosition } = useSettings();
-    const isDark = resolvedTheme === 'dark';
+    const isDark = theme === 'dark';
 
     // Scroll position remembering
     const scrollViewRef = useRef<ScrollView>(null);
@@ -40,7 +39,6 @@ export const SettingsScreen: React.FC = () => {
     const [resetModalVisible, setResetModalVisible] = useState(false);
 
     const themeOptions = [
-        { value: 'system' as const, label: 'System', description: 'Follow device settings' },
         { value: 'light' as const, label: 'Light', description: 'Always use light theme' },
         { value: 'dark' as const, label: 'Dark', description: 'Always use dark theme' },
     ];
@@ -94,8 +92,8 @@ export const SettingsScreen: React.FC = () => {
     };
 
     const confirmResetSettings = () => {
-        // Reset theme to system
-        setTheme('system');
+        // Reset theme to light
+        setTheme('light');
 
         // Reset unit to kg
         setUnit('kg');
@@ -555,7 +553,10 @@ export const SettingsScreen: React.FC = () => {
             <View style={{ flex: 1 }}>
                 <ScrollView
                     ref={scrollViewRef}
-                    style={{ flex: 1 }}
+                    style={{
+                        flex: 1,
+                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                    }}
                     contentContainerStyle={{ paddingBottom: 60 }}
                     onScroll={(event) => {
                         const offsetY = event.nativeEvent.contentOffset.y;

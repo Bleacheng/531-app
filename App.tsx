@@ -17,9 +17,9 @@ type Screen = 'home' | 'profile' | 'settings';
 
 // Main app content component
 const AppContent = () => {
-  const { resolvedTheme } = useTheme();
+  const { theme } = useTheme();
   const [currentScreen, setCurrentScreen] = React.useState<Screen>('home');
-  const isDark = resolvedTheme === 'dark';
+  const isDark = theme === 'dark';
 
   const handleNavigate = (screen: Screen) => {
     setCurrentScreen(screen);
@@ -64,7 +64,7 @@ const AppContent = () => {
           subtitle="App preferences"
         />
       )}
-      <View style={{ flex: 1, paddingHorizontal: 20 }}>
+      <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 10 }}>
         {renderScreen()}
       </View>
       <Footer
@@ -78,8 +78,8 @@ const AppContent = () => {
 
 // ThemeWrapper: gets theme from context and passes to PaperProvider
 const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { resolvedTheme } = useTheme();
-  const paperTheme = resolvedTheme === 'dark' ? MD3DarkTheme : MD3LightTheme;
+  const { theme } = useTheme();
+  const paperTheme = theme === 'dark' ? MD3DarkTheme : MD3LightTheme;
   return <PaperProvider theme={paperTheme}>{children}</PaperProvider>;
 };
 

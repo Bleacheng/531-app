@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Alert, Share, Platform, TouchableOpacity, View } from 'react-native';
+import { Alert, Share, Platform, TouchableOpacity, View, Text } from 'react-native';
 import Modal from 'react-native-modal';
-import { Text } from 'react-native-paper';
 import { Download, Upload, FileText, AlertTriangle, CheckCircle, X } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
@@ -21,8 +20,8 @@ interface DataBackupProps {
 }
 
 export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
-    const { resolvedTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
     const [isExporting, setIsExporting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [importModalVisible, setImportModalVisible] = useState(false);

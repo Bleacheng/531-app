@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { ScrollView, View } from 'react-native';
-import { Text } from 'react-native-paper';
+import { ScrollView, View, Text } from 'react-native';
 import { TrendingUp, Calendar, Target, History, Dumbbell } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
@@ -9,9 +8,9 @@ import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 
 export const HistoryScreen: React.FC = () => {
-    const { resolvedTheme } = useTheme();
+    const { theme } = useTheme();
     const { formatWeight, saveScrollPosition, getScrollPosition } = useSettings();
-    const isDark = resolvedTheme === 'dark';
+    const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
 
     // Restore scroll position when component mounts
@@ -103,7 +102,10 @@ export const HistoryScreen: React.FC = () => {
     return (
         <ScrollView
             ref={scrollViewRef}
-            style={{ flex: 1 }}
+            style={{
+                flex: 1,
+                backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+            }}
             contentContainerStyle={{ paddingBottom: 60 }}
             onScroll={(event) => {
                 const offsetY = event.nativeEvent.contentOffset.y;

@@ -1,6 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, View } from 'react-native';
-import { Card as PaperCard, Text } from 'react-native-paper';
+import { TouchableOpacity, View, Text } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
@@ -22,11 +21,13 @@ export const Card: React.FC<CardProps> = ({
     backgroundColor,
     onPress
 }) => {
-    const { resolvedTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
+
+    const CardContainer = onPress ? TouchableOpacity : View;
 
     return (
-        <PaperCard
+        <CardContainer
             style={{
                 borderColor: borderColor || (isDark ? COLORS.borderDark : COLORS.border),
                 backgroundColor: backgroundColor || (isDark ? COLORS.backgroundSecondaryDark : COLORS.backgroundSecondary),
@@ -34,16 +35,27 @@ export const Card: React.FC<CardProps> = ({
                 borderRadius: 12,
                 marginBottom: 16,
                 elevation: 2,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
             }}
             onPress={onPress}
+            activeOpacity={onPress ? 0.8 : 1}
         >
-            <PaperCard.Content style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 16, paddingBottom: 8 }}>
                 {Icon && <Icon size={20} color={isDark ? COLORS.primaryLight : COLORS.primaryDark} style={{ marginRight: 8 }} />}
-                <Text variant="titleMedium" style={{ color: isDark ? COLORS.textDark : COLORS.text, fontWeight: 'bold' }}>{title}</Text>
-            </PaperCard.Content>
-            <PaperCard.Content>
+                <Text style={{
+                    color: isDark ? COLORS.textDark : COLORS.text,
+                    fontWeight: 'bold',
+                    fontSize: 18,
+                    flex: 1
+                }}>
+                    {title}
+                </Text>
+            </View>
+            <View style={{ padding: 16, paddingTop: 0 }}>
                 {children}
-            </PaperCard.Content>
-        </PaperCard>
+            </View>
+        </CardContainer>
     );
 }; 

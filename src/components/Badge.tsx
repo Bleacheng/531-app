@@ -14,8 +14,8 @@ export const Badge: React.FC<BadgeProps> = ({
     variant = 'primary',
     size = 'medium'
 }) => {
-    const { resolvedTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
 
     const getBadgeStyles = () => {
         const baseStyles = {
