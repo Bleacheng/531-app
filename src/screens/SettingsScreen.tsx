@@ -558,7 +558,7 @@ export const SettingsScreen: React.FC = () => {
                                 Choose your preferred theme
                             </Text>
                         </Stack>
-                        <Stack gap={8}>
+                        <Stack gap={12}>
                             {themeOptions.map((option) => (
                                 <Button
                                     key={option.value}
@@ -586,7 +586,7 @@ export const SettingsScreen: React.FC = () => {
                                 Choose your preferred weight units
                             </Text>
                         </Stack>
-                        <Stack gap={8}>
+                        <Stack gap={12}>
                             {unitOptions.map((option) => (
                                 <Button
                                     key={option.value}
@@ -603,7 +603,6 @@ export const SettingsScreen: React.FC = () => {
                             <Text
                                 fontSize={14}
                                 color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginBottom={8}
                             >
                                 Example: {formatWeight(100)}
                             </Text>
@@ -626,7 +625,7 @@ export const SettingsScreen: React.FC = () => {
                             </Text>
                         </Stack>
 
-                        <Stack gap={16}>
+                        <Stack gap={12}>
                             {Object.entries(exerciseNames).map(([key, name]) => (
                                 <Stack key={key} gap={8}>
                                     <Text
