@@ -5,7 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
 
 interface ButtonProps {
-    title: string;
+    children: React.ReactNode;
     onPress: () => void;
     variant?: 'primary' | 'secondary' | 'outline';
     icon?: LucideIcon;
@@ -17,18 +17,18 @@ interface ButtonProps {
 }
 
 export const Button: React.FC<ButtonProps> = ({
-    title,
+    children,
     onPress,
     variant = 'primary',
-    icon: Icon,
+    icon: IconComponent,
     iconPosition = 'left',
     disabled = false,
     fullWidth = false,
     style,
     textStyle,
 }) => {
-    const { theme } = useTheme();
-    const isDark = theme === 'dark';
+    const { resolvedTheme } = useTheme();
+    const isDark = resolvedTheme === 'dark';
 
     const getButtonStyles = () => {
         let baseStyles: any = {
@@ -77,7 +77,7 @@ export const Button: React.FC<ButtonProps> = ({
 
     const getTextColor = () => {
         if (variant === 'outline') {
-            return isDark ? COLORS.secondaryLight : COLORS.secondary;
+            return isDark ? COLORS.textDark : COLORS.text;
         }
         return 'white';
     };
@@ -92,29 +92,29 @@ export const Button: React.FC<ButtonProps> = ({
             disabled={disabled}
             activeOpacity={0.8}
         >
-            {Icon && iconPosition === 'left' && (
-                <Icon
+            {IconComponent && iconPosition === 'left' && (
+                <IconComponent
                     size={18}
-                    color={textStyle?.color || textColor}
+                    color={textColor}
                     style={{ marginRight: 8 }}
                 />
             )}
             <Text
                 style={[
                     {
-                        color: textStyle?.color || textColor,
+                        color: textColor,
                         fontWeight: 'bold',
-                        fontSize: 16
+                        fontSize: 16,
                     },
                     textStyle
                 ]}
             >
-                {title}
+                {children}
             </Text>
-            {Icon && iconPosition === 'right' && (
-                <Icon
+            {IconComponent && iconPosition === 'right' && (
+                <IconComponent
                     size={18}
-                    color={textStyle?.color || textColor}
+                    color={textColor}
                     style={{ marginLeft: 8 }}
                 />
             )}

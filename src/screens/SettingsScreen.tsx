@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TextInput, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
-import { Stack, Text } from '@tamagui/core';
+import { TextInput, TouchableOpacity, ScrollView, Alert, View } from 'react-native';
+import Modal from 'react-native-modal';
+import { Text } from 'react-native-paper';
 import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -178,25 +179,29 @@ export const SettingsScreen: React.FC = () => {
                     justifyContent: 'space-between',
                 }}
             >
-                <Stack flex={1}>
+                <View style={{ flex: 1 }}>
                     <Text
-                        fontSize={16}
-                        color={isDark ? COLORS.textDark : COLORS.text}
-                        fontWeight="500"
+                        style={{
+                            fontSize: 16,
+                            fontWeight: '500',
+                            color: isDark ? COLORS.textDark : COLORS.text,
+                        }}
                     >
                         {currentDay}
                     </Text>
                     {/* Show conflict warning if applicable */}
                     {getAvailableDays(exercise).find(d => d.day === currentDay)?.hasConflict && (
                         <Text
-                            fontSize={12}
-                            color={isDark ? COLORS.warning : COLORS.warningDark}
-                            marginTop={2}
+                            style={{
+                                fontSize: 12,
+                                color: isDark ? COLORS.warning : COLORS.warningDark,
+                                marginTop: 2,
+                            }}
                         >
                             Conflicts with {getAvailableDays(exercise).find(d => d.day === currentDay)?.conflictingExercise}
                         </Text>
                     )}
-                </Stack>
+                </View>
                 <ChevronDown
                     size={16}
                     color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
@@ -213,147 +218,141 @@ export const SettingsScreen: React.FC = () => {
 
         return (
             <Modal
-                animationType="fade"
-                transparent={true}
-                visible={modalVisible}
-                statusBarTranslucent={true}
-                onRequestClose={() => {
+                isVisible={modalVisible}
+                onBackdropPress={() => {
                     setModalVisible(false);
                     setSelectedExercise(null);
                 }}
+                style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 20,
+                }}
             >
-                <TouchableOpacity
+                <View
                     style={{
-                        position: 'absolute',
-                        top: -1000,
-                        left: -1000,
-                        right: -1000,
-                        bottom: -1000,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
+                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                        borderRadius: 12,
                         padding: 20,
-                    }}
-                    activeOpacity={1}
-                    onPress={() => {
-                        setModalVisible(false);
-                        setSelectedExercise(null);
+                        width: '100%',
+                        maxWidth: 400,
+                        shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 10,
                     }}
                 >
-                    <Stack
-                        style={{
-                            backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
-                            borderRadius: 12,
-                            padding: 20,
-                            width: '100%',
-                            maxWidth: 400,
-                            shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 8,
-                            elevation: 10,
-                        }}
-                        onStartShouldSetResponder={() => true}
-                    >
-                        {/* Header */}
-                        <Stack marginBottom={20}>
-                            <Text
-                                fontSize={20}
-                                fontWeight="bold"
-                                color={isDark ? COLORS.textDark : COLORS.text}
-                                marginBottom={8}
-                            >
-                                Select Day for {exerciseName}
-                            </Text>
-                            <Text
-                                fontSize={14}
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                            >
-                                Choose which day to perform this exercise
-                            </Text>
-                        </Stack>
+                    {/* Header */}
+                    <View style={{ marginBottom: 20 }}>
+                        <Text
+                            style={{
+                                fontSize: 20,
+                                fontWeight: 'bold',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                marginBottom: 8,
+                            }}
+                        >
+                            Select Day for {exerciseName}
+                        </Text>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            }}
+                        >
+                            Choose which day to perform this exercise
+                        </Text>
+                    </View>
 
-                        {/* Day Options */}
-                        <Stack gap={8}>
-                            {availableDays.map((dayInfo) => (
-                                <TouchableOpacity
-                                    key={dayInfo.day}
-                                    onPress={() => handleDaySelect(selectedExercise, dayInfo.day)}
-                                    style={{
-                                        padding: 16,
-                                        backgroundColor: dayInfo.isCurrent
-                                            ? (isDark ? COLORS.primary + '20' : COLORS.primaryDark + '20')
-                                            : dayInfo.hasConflict && !dayInfo.isCurrent
-                                                ? (isDark ? COLORS.warningDark + '20' : COLORS.warning + '20')
-                                                : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                        borderWidth: 1,
-                                        borderColor: dayInfo.isCurrent
-                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                            : dayInfo.hasConflict && !dayInfo.isCurrent
-                                                ? (isDark ? COLORS.warning : COLORS.warningDark)
-                                                : (isDark ? COLORS.borderDark : COLORS.border),
-                                        borderRadius: 8,
-                                    }}
-                                >
-                                    <Stack>
-                                        <Text
-                                            fontSize={16}
-                                            color={dayInfo.isCurrent
+                    {/* Day Options */}
+                    <View style={{ gap: 8 }}>
+                        {availableDays.map((dayInfo) => (
+                            <TouchableOpacity
+                                key={dayInfo.day}
+                                onPress={() => handleDaySelect(selectedExercise, dayInfo.day)}
+                                style={{
+                                    padding: 16,
+                                    backgroundColor: dayInfo.isCurrent
+                                        ? (isDark ? COLORS.primary + '20' : COLORS.primaryDark + '20')
+                                        : dayInfo.hasConflict && !dayInfo.isCurrent
+                                            ? (isDark ? COLORS.warningDark + '20' : COLORS.warning + '20')
+                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                    borderWidth: 1,
+                                    borderColor: dayInfo.isCurrent
+                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                        : dayInfo.hasConflict && !dayInfo.isCurrent
+                                            ? (isDark ? COLORS.warning : COLORS.warningDark)
+                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                    borderRadius: 8,
+                                }}
+                            >
+                                <View>
+                                    <Text
+                                        style={{
+                                            fontSize: 16,
+                                            color: dayInfo.isCurrent
                                                 ? (isDark ? COLORS.primary : COLORS.primaryDark)
                                                 : dayInfo.hasConflict
                                                     ? (isDark ? COLORS.warning : COLORS.warningDark)
-                                                    : (isDark ? COLORS.textDark : COLORS.text)
-                                            }
-                                            fontWeight={dayInfo.isCurrent ? "600" : "400"}
+                                                    : (isDark ? COLORS.textDark : COLORS.text),
+                                            fontWeight: dayInfo.isCurrent ? "600" : "400"
+                                        }}
+                                    >
+                                        {dayInfo.day}
+                                    </Text>
+                                    {dayInfo.isCurrent && (
+                                        <Text
+                                            style={{
+                                                fontSize: 12,
+                                                color: isDark ? COLORS.primary : COLORS.primaryDark,
+                                                marginTop: 2,
+                                            }}
                                         >
-                                            {dayInfo.day}
+                                            Currently selected
                                         </Text>
-                                        {dayInfo.isCurrent && (
-                                            <Text
-                                                fontSize={12}
-                                                color={isDark ? COLORS.primary : COLORS.primaryDark}
-                                                marginTop={2}
-                                            >
-                                                Currently selected
-                                            </Text>
-                                        )}
-                                        {dayInfo.hasConflict && !dayInfo.isCurrent && (
-                                            <Text
-                                                fontSize={12}
-                                                color={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
-                                                marginTop={2}
-                                            >
-                                                Conflicts with {dayInfo.conflictingExercise}
-                                            </Text>
-                                        )}
-                                        {!dayInfo.hasConflict && !dayInfo.isCurrent && (
-                                            <Text
-                                                fontSize={12}
-                                                color={isDark ? COLORS.success : COLORS.successDark}
-                                                marginTop={2}
-                                            >
-                                                Available
-                                            </Text>
-                                        )}
-                                    </Stack>
-                                </TouchableOpacity>
-                            ))}
-                        </Stack>
+                                    )}
+                                    {dayInfo.hasConflict && !dayInfo.isCurrent && (
+                                        <Text
+                                            style={{
+                                                fontSize: 12,
+                                                color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary,
+                                                marginTop: 2,
+                                            }}
+                                        >
+                                            Conflicts with {dayInfo.conflictingExercise}
+                                        </Text>
+                                    )}
+                                    {!dayInfo.hasConflict && !dayInfo.isCurrent && (
+                                        <Text
+                                            style={{
+                                                fontSize: 12,
+                                                color: isDark ? COLORS.success : COLORS.successDark,
+                                                marginTop: 2,
+                                            }}
+                                        >
+                                            Available
+                                        </Text>
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
 
-                        {/* Cancel Button */}
-                        <Stack marginTop={20}>
-                            <Button
-                                title="Cancel"
-                                onPress={() => {
-                                    setModalVisible(false);
-                                    setSelectedExercise(null);
-                                }}
-                                variant="outline"
-                                fullWidth
-                            />
-                        </Stack>
-                    </Stack>
-                </TouchableOpacity>
+                    {/* Cancel Button */}
+                    <View style={{ marginTop: 20 }}>
+                        <Button
+                            onPress={() => {
+                                setModalVisible(false);
+                                setSelectedExercise(null);
+                            }}
+                            variant="outline"
+                            fullWidth
+                        >
+                            Cancel
+                        </Button>
+                    </View>
+                </View>
             </Modal>
         );
     };
@@ -361,171 +360,168 @@ export const SettingsScreen: React.FC = () => {
     const renderResetSettingsModal = () => {
         return (
             <Modal
-                animationType="fade"
-                transparent={true}
-                visible={resetModalVisible}
-                statusBarTranslucent={true}
-                onRequestClose={() => setResetModalVisible(false)}
+                isVisible={resetModalVisible}
+                onBackdropPress={() => setResetModalVisible(false)}
+                style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 20,
+                }}
             >
-                <TouchableOpacity
+                <View
                     style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
+                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                        borderRadius: 12,
                         padding: 20,
+                        width: '100%',
+                        maxWidth: 400,
+                        shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 10,
                     }}
-                    activeOpacity={1}
-                    onPress={() => setResetModalVisible(false)}
                 >
-                    <Stack
-                        style={{
-                            backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
-                            borderRadius: 12,
-                            padding: 20,
-                            width: '100%',
-                            maxWidth: 400,
-                            shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 8,
-                            elevation: 10,
-                        }}
-                        onStartShouldSetResponder={() => true}
-                    >
-                        {/* Header */}
-                        <Stack marginBottom={20}>
-                            <Stack flexDirection="row" alignItems="center" marginBottom={12}>
-                                <RotateCcw size={24} color={isDark ? COLORS.error : COLORS.errorDark} />
-                                <Text
-                                    style={{
-                                        fontSize: 20,
-                                        fontWeight: 'bold',
-                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                        marginLeft: 8,
-                                    }}
-                                >
-                                    Reset All Settings
-                                </Text>
-                            </Stack>
+                    {/* Header */}
+                    <View style={{ marginBottom: 20 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <RotateCcw size={24} color={isDark ? COLORS.error : COLORS.errorDark} />
                             <Text
                                 style={{
-                                    fontSize: 14,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    fontSize: 20,
+                                    fontWeight: 'bold',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginLeft: 8,
                                 }}
                             >
-                                This will reset all settings to their default values. This action cannot be undone.
+                                Reset All Settings
                             </Text>
-                        </Stack>
-
-                        {/* Warning */}
-                        <Stack
+                        </View>
+                        <Text
                             style={{
-                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
-                                padding: 12,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                                marginBottom: 16,
+                                fontSize: 14,
+                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                             }}
                         >
-                            <Stack flexDirection="row" alignItems="center" marginBottom={4}>
-                                <AlertTriangle size={14} color={isDark ? COLORS.error : COLORS.errorDark} />
-                                <Text
-                                    fontSize={12}
-                                    fontWeight="600"
-                                    color={isDark ? COLORS.error : COLORS.errorDark}
-                                    marginLeft={6}
-                                >
-                                    Alert
-                                </Text>
-                            </Stack>
-                            <Text
-                                fontSize={12}
-                                color={isDark ? COLORS.error : COLORS.errorDark}
-                            >
-                                This will reset your theme, units, workout schedule, and exercise progression to their default values. Your workout history and personal records will not be affected.
-                            </Text>
-                        </Stack>
+                            This will reset all settings to their default values. This action cannot be undone.
+                        </Text>
+                    </View>
 
-                        {/* What will be reset */}
-                        <Stack marginBottom={20}>
+                    {/* Warning */}
+                    <View
+                        style={{
+                            backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                            padding: 16,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                            marginBottom: 20,
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
                             <Text
                                 style={{
                                     fontSize: 14,
                                     fontWeight: '600',
-                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                    marginBottom: 8,
+                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                    marginLeft: 6,
                                 }}
                             >
-                                Settings that will be reset:
+                                Warning
                             </Text>
-                            <Stack gap={4}>
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    }}
-                                >
-                                    • Theme: System (follow device settings)
-                                </Text>
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    }}
-                                >
-                                    • Units: Kilograms (kg)
-                                </Text>
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    }}
-                                >
-                                    • Workout Schedule: Default days
-                                </Text>
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    }}
-                                >
-                                    • Exercise Progression: Default values
-                                </Text>
-                            </Stack>
-                        </Stack>
+                        </View>
+                        <Text
+                            style={{
+                                fontSize: 12,
+                                color: isDark ? COLORS.error : COLORS.errorDark,
+                                lineHeight: 16,
+                            }}
+                        >
+                            This action will reset all settings to their default values. Your workout history and personal records will not be affected.
+                        </Text>
+                    </View>
 
-                        {/* Buttons */}
-                        <Stack gap={12}>
-                            <Button
-                                title="Reset All Settings"
-                                onPress={confirmResetSettings}
-                                variant="outline"
-                                fullWidth
+                    {/* What will be reset */}
+                    <View style={{ marginBottom: 20 }}>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                marginBottom: 8,
+                            }}
+                        >
+                            Settings that will be reset:
+                        </Text>
+                        <View style={{ gap: 4 }}>
+                            <Text
                                 style={{
-                                    borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                 }}
-                            />
-                            <Button
-                                title="Cancel"
-                                onPress={() => setResetModalVisible(false)}
-                                variant="outline"
-                                fullWidth
-                            />
-                        </Stack>
-                    </Stack>
-                </TouchableOpacity>
+                            >
+                                • Theme: System (follow device settings)
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Units: Kilograms (kg)
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Workout Schedule: Default days
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Exercise Progression: Default values
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Buttons */}
+                    <View style={{ gap: 12 }}>
+                        <Button
+                            onPress={confirmResetSettings}
+                            variant="outline"
+                            fullWidth
+                            style={{
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                            }}
+                        >
+                            Reset All Settings
+                        </Button>
+                        <Button
+                            onPress={() => setResetModalVisible(false)}
+                            variant="outline"
+                            fullWidth
+                        >
+                            Cancel
+                        </Button>
+                    </View>
+                </View>
             </Modal>
         );
     };
 
     return (
         <>
-            <Stack style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
                 <ScrollView
                     ref={scrollViewRef}
-                    style={{ flex: 1, padding: 20 }}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
                     onScroll={(event) => {
                         const offsetY = event.nativeEvent.contentOffset.y;
                         saveScrollPosition('settings', offsetY);
@@ -533,42 +529,47 @@ export const SettingsScreen: React.FC = () => {
                     scrollEventThrottle={16}
                 >
                     {/* Header */}
-                    <Stack marginBottom={20}>
+                    <View style={{ marginBottom: 20 }}>
                         <Text
-                            fontSize={24}
-                            fontWeight="bold"
-                            color={isDark ? COLORS.textDark : COLORS.text}
+                            style={{
+                                fontSize: 24,
+                                fontWeight: 'bold',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                            }}
                         >
                             Settings
                         </Text>
-                    </Stack>
+                    </View>
 
                     {/* Theme Settings */}
                     <Card
                         title="Theme"
                         borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
                     >
-                        <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                             <Palette size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                             <Text
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginLeft={8}
-                                fontSize={14}
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
                             >
                                 Choose your preferred theme
                             </Text>
-                        </Stack>
-                        <Stack gap={12}>
+                        </View>
+                        <View style={{ gap: 12 }}>
                             {themeOptions.map((option) => (
                                 <Button
                                     key={option.value}
-                                    title={`${option.label} - ${option.description}`}
                                     onPress={() => setTheme(option.value)}
                                     variant={theme === option.value ? 'primary' : 'outline'}
                                     fullWidth
-                                />
+                                >
+                                    {`${option.label} - ${option.description}`}
+                                </Button>
                             ))}
-                        </Stack>
+                        </View>
                     </Card>
 
                     {/* Unit Settings */}
@@ -576,37 +577,42 @@ export const SettingsScreen: React.FC = () => {
                         title="Units"
                         borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
                     >
-                        <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                             <Scale size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                             <Text
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginLeft={8}
-                                fontSize={14}
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
                             >
                                 Choose your preferred weight units
                             </Text>
-                        </Stack>
-                        <Stack gap={12}>
+                        </View>
+                        <View style={{ gap: 12 }}>
                             {unitOptions.map((option) => (
                                 <Button
                                     key={option.value}
-                                    title={`${option.label} - ${option.description}`}
                                     onPress={() => setUnit(option.value)}
                                     variant={unit === option.value ? 'primary' : 'outline'}
                                     fullWidth
-                                />
+                                >
+                                    {`${option.label} - ${option.description}`}
+                                </Button>
                             ))}
-                        </Stack>
+                        </View>
 
                         {/* Example */}
-                        <Stack marginTop={15} padding={12} backgroundColor={isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary} borderRadius={8}>
+                        <View style={{ marginTop: 15, padding: 12, backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary, borderRadius: 8 }}>
                             <Text
-                                fontSize={14}
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                style={{
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
                             >
                                 Example: {formatWeight(100)}
                             </Text>
-                        </Stack>
+                        </View>
                     </Card>
 
                     {/* Workout Schedule */}
@@ -614,31 +620,35 @@ export const SettingsScreen: React.FC = () => {
                         title="Workout Schedule"
                         borderColor={isDark ? COLORS.successLight : COLORS.success}
                     >
-                        <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                             <Calendar size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                             <Text
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginLeft={8}
-                                fontSize={14}
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
                             >
                                 Select which day each exercise is performed
                             </Text>
-                        </Stack>
+                        </View>
 
-                        <Stack gap={12}>
+                        <View style={{ gap: 12 }}>
                             {Object.entries(exerciseNames).map(([key, name]) => (
-                                <Stack key={key} gap={8}>
+                                <View key={key} style={{ gap: 8 }}>
                                     <Text
-                                        fontSize={16}
-                                        fontWeight="600"
-                                        color={isDark ? COLORS.textDark : COLORS.text}
+                                        style={{
+                                            fontSize: 16,
+                                            fontWeight: '600',
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                        }}
                                     >
                                         {name}
                                     </Text>
                                     {renderDaySelector(key as keyof typeof workoutSchedule)}
-                                </Stack>
+                                </View>
                             ))}
-                        </Stack>
+                        </View>
                     </Card>
 
                     {/* Exercise Progression Settings */}
@@ -646,30 +656,36 @@ export const SettingsScreen: React.FC = () => {
                         title="Exercise Progression"
                         borderColor={isDark ? COLORS.warningLight : COLORS.warning}
                     >
-                        <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                             <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                             <Text
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginLeft={8}
-                                fontSize={14}
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
                             >
                                 Set weight progression per cycle
                             </Text>
-                        </Stack>
-                        <Stack gap={12}>
+                        </View>
+                        <View style={{ gap: 12 }}>
                             {Object.entries(exerciseNames).map(([key, name]) => (
-                                <Stack key={key} gap={8}>
+                                <View key={key} style={{ gap: 8 }}>
                                     <Text
-                                        fontSize={16}
-                                        fontWeight="600"
-                                        color={isDark ? COLORS.textDark : COLORS.text}
+                                        style={{
+                                            fontSize: 16,
+                                            fontWeight: '600',
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                        }}
                                     >
                                         {name}
                                     </Text>
-                                    <Stack flexDirection="row" alignItems="center" gap={8}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <Text
-                                            fontSize={14}
-                                            color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                            style={{
+                                                fontSize: 14,
+                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            }}
                                         >
                                             +{unit}
                                         </Text>
@@ -691,10 +707,10 @@ export const SettingsScreen: React.FC = () => {
                                             placeholder="2.5"
                                             placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
                                         />
-                                    </Stack>
-                                </Stack>
+                                    </View>
+                                </View>
                             ))}
-                        </Stack>
+                        </View>
                     </Card>
 
                     {/* Data Backup & Restore */}
@@ -711,19 +727,21 @@ export const SettingsScreen: React.FC = () => {
                         title="Reset Settings"
                         borderColor={isDark ? COLORS.errorLight : COLORS.error}
                     >
-                        <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                             <RotateCcw size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
                             <Text
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginLeft={8}
-                                fontSize={14}
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
                             >
                                 Reset all settings to their default values
                             </Text>
-                        </Stack>
+                        </View>
 
                         {/* Warning */}
-                        <Stack
+                        <View
                             style={{
                                 backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
                                 padding: 12,
@@ -733,40 +751,42 @@ export const SettingsScreen: React.FC = () => {
                                 marginBottom: 16,
                             }}
                         >
-                            <Stack flexDirection="row" alignItems="center" marginBottom={4}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                                 <AlertTriangle size={14} color={isDark ? COLORS.error : COLORS.errorDark} />
                                 <Text
-                                    fontSize={12}
-                                    fontWeight="600"
-                                    color={isDark ? COLORS.error : COLORS.errorDark}
-                                    marginLeft={6}
+                                    style={{
+                                        fontSize: 12,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.error : COLORS.errorDark,
+                                        marginLeft: 6,
+                                    }}
                                 >
                                     Alert
                                 </Text>
-                            </Stack>
+                            </View>
                             <Text
-                                fontSize={12}
-                                color={isDark ? COLORS.error : COLORS.errorDark}
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                }}
                             >
                                 This will reset your theme, units, workout schedule, and exercise progression to their default values. Your workout history and personal records will not be affected.
                             </Text>
-                        </Stack>
+                        </View>
 
                         <Button
-                            title="Reset All Settings"
                             onPress={handleResetSettings}
                             variant="outline"
                             fullWidth
                             style={{
                                 borderColor: isDark ? COLORS.error : COLORS.errorDark,
                             }}
-                            textStyle={{
-                                color: isDark ? COLORS.error : COLORS.errorDark,
-                            }}
-                        />
+                        >
+                            Reset All Settings
+                        </Button>
                     </Card>
                 </ScrollView>
-            </Stack>
+            </View>
 
             {renderDaySelectorModal()}
             {renderResetSettingsModal()}

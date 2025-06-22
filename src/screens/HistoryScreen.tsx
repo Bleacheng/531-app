@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { ScrollView } from 'react-native';
-import { Stack, Text } from '@tamagui/core';
+import { ScrollView, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { TrendingUp, Calendar, Target, History, Dumbbell } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Badge } from '../components/Badge';
@@ -103,7 +103,8 @@ export const HistoryScreen: React.FC = () => {
     return (
         <ScrollView
             ref={scrollViewRef}
-            style={{ flex: 1, padding: 20 }}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 60 }}
             onScroll={(event) => {
                 const offsetY = event.nativeEvent.contentOffset.y;
                 saveScrollPosition('history', offsetY);
@@ -115,22 +116,24 @@ export const HistoryScreen: React.FC = () => {
                 title="Your Progress"
                 borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
             >
-                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                     <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
-                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        marginLeft={8}
-                        fontSize={14}
+                        style={{
+                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            marginLeft: 8,
+                            fontSize: 14
+                        }}
                     >
                         Overall statistics
                     </Text>
-                </Stack>
+                </View>
 
-                <Stack flexDirection="row" flexWrap="wrap" gap={10}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
                     {stats.map((stat, index) => {
                         const Icon = stat.icon;
                         return (
-                            <Stack
+                            <View
                                 key={index}
                                 style={{
                                     backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
@@ -142,27 +145,31 @@ export const HistoryScreen: React.FC = () => {
                                     flex: 1,
                                 }}
                             >
-                                <Stack flexDirection="row" alignItems="center" marginBottom={8}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                                     <Icon size={16} color={stat.color} />
                                     <Text
-                                        fontSize={12}
-                                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                        marginLeft={6}
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            marginLeft: 6
+                                        }}
                                     >
                                         {stat.title}
                                     </Text>
-                                </Stack>
+                                </View>
                                 <Text
-                                    fontSize={18}
-                                    fontWeight="bold"
-                                    color={isDark ? COLORS.textDark : COLORS.text}
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: 'bold',
+                                        color: isDark ? COLORS.textDark : COLORS.text
+                                    }}
                                 >
                                     {stat.value}
                                 </Text>
-                            </Stack>
+                            </View>
                         );
                     })}
-                </Stack>
+                </View>
             </Card>
 
             {/* Recent Progress */}
@@ -170,41 +177,47 @@ export const HistoryScreen: React.FC = () => {
                 title="Recent Progress"
                 borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
             >
-                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                     <Target size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
-                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        marginLeft={8}
-                        fontSize={14}
+                        style={{
+                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            marginLeft: 8,
+                            fontSize: 14
+                        }}
                     >
                         Last 30 days
                     </Text>
-                </Stack>
-                <Stack gap={12}>
+                </View>
+                <View style={{ gap: 12 }}>
                     {recentProgress.map((item, index) => (
-                        <Stack key={index} flexDirection="row" justifyContent="space-between" alignItems="center">
-                            <Stack flex={1}>
+                        <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
                                 <Text
-                                    fontSize={16}
-                                    color={isDark ? COLORS.textDark : COLORS.text}
-                                    fontWeight="500"
+                                    style={{
+                                        fontSize: 16,
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        fontWeight: '500'
+                                    }}
                                 >
                                     {item.exercise}
                                 </Text>
                                 <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                    style={{
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                    }}
                                 >
                                     {formatWeight(item.current)} (was {formatWeight(item.previous)})
                                 </Text>
-                            </Stack>
+                            </View>
                             <Badge
                                 label={item.change > 0 ? `+${item.change} kg` : item.change < 0 ? `${item.change} kg` : '0 kg'}
                                 variant={item.status}
                             />
-                        </Stack>
+                        </View>
                     ))}
-                </Stack>
+                </View>
             </Card>
 
             {/* Workout History */}
@@ -212,19 +225,21 @@ export const HistoryScreen: React.FC = () => {
                 title="Workout History"
                 borderColor={isDark ? COLORS.successLight : COLORS.success}
             >
-                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                     <History size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
-                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        marginLeft={8}
-                        fontSize={14}
+                        style={{
+                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            marginLeft: 8,
+                            fontSize: 14
+                        }}
                     >
                         Recent workouts
                     </Text>
-                </Stack>
-                <Stack gap={12}>
+                </View>
+                <View style={{ gap: 12 }}>
                     {workoutHistory.map((workout, index) => (
-                        <Stack
+                        <View
                             key={index}
                             style={{
                                 backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
@@ -234,11 +249,13 @@ export const HistoryScreen: React.FC = () => {
                                 borderColor: isDark ? COLORS.borderDark : COLORS.border,
                             }}
                         >
-                            <Stack flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={4}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                                 <Text
-                                    fontSize={16}
-                                    fontWeight="bold"
-                                    color={isDark ? COLORS.textDark : COLORS.text}
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: 'bold',
+                                        color: isDark ? COLORS.textDark : COLORS.text
+                                    }}
                                 >
                                     {workout.workout}
                                 </Text>
@@ -246,26 +263,30 @@ export const HistoryScreen: React.FC = () => {
                                     label={workout.date}
                                     variant="complementary"
                                 />
-                            </Stack>
+                            </View>
                             <Text
-                                fontSize={14}
-                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                                marginBottom={4}
+                                style={{
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 4
+                                }}
                             >
                                 {workout.exercises.join(' • ')}
                             </Text>
-                            <Stack flexDirection="row" alignItems="center">
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Text
-                                    fontSize={12}
-                                    color={getStatusColor(workout.status)}
-                                    fontWeight="500"
+                                    style={{
+                                        fontSize: 12,
+                                        color: getStatusColor(workout.status),
+                                        fontWeight: '500'
+                                    }}
                                 >
                                     ✓ Completed
                                 </Text>
-                            </Stack>
-                        </Stack>
+                            </View>
+                        </View>
                     ))}
-                </Stack>
+                </View>
             </Card>
         </ScrollView>
     );

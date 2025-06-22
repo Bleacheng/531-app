@@ -1,9 +1,9 @@
 import { StatusBar } from 'expo-status-bar';
-import { TamaguiProvider, View } from '@tamagui/core';
-import { useState } from 'react';
-import { SafeAreaView } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import tamaguiConfig from './tamagui.config';
+import { Provider as PaperProvider, MD3LightTheme, MD3DarkTheme } from 'react-native-paper';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
 import { SettingsProvider } from './src/contexts/SettingsContext';
 import { Header } from './src/components/Header';
@@ -18,7 +18,7 @@ type Screen = 'home' | 'profile' | 'settings';
 // Main app content component
 const AppContent = () => {
   const { resolvedTheme } = useTheme();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [currentScreen, setCurrentScreen] = React.useState<Screen>('home');
   const isDark = resolvedTheme === 'dark';
 
   const handleNavigate = (screen: Screen) => {
@@ -44,6 +44,7 @@ const AppContent = () => {
         flex: 1,
         backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
       }}
+      edges={['left', 'right']}
     >
       {currentScreen === 'home' && (
         <Header
@@ -51,28 +52,37 @@ const AppContent = () => {
           subtitle="Uh vro can i get uuuuuh"
         />
       )}
-      <View flex={1}>
+      <View style={{ flex: 1, paddingHorizontal: 20 }}>
         {renderScreen()}
       </View>
       <Footer
         currentScreen={currentScreen}
         onNavigate={handleNavigate}
       />
-      <StatusBar style={isDark ? "light" : "dark"} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
     </SafeAreaView>
   );
+};
+
+// ThemeWrapper: gets theme from context and passes to PaperProvider
+const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { resolvedTheme } = useTheme();
+  const paperTheme = resolvedTheme === 'dark' ? MD3DarkTheme : MD3LightTheme;
+  return <PaperProvider theme={paperTheme}>{children}</PaperProvider>;
 };
 
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <TamaguiProvider config={tamaguiConfig}>
+      <SafeAreaProvider>
         <ThemeProvider>
-          <SettingsProvider>
-            <AppContent />
-          </SettingsProvider>
+          <ThemeWrapper>
+            <SettingsProvider>
+              <AppContent />
+            </SettingsProvider>
+          </ThemeWrapper>
         </ThemeProvider>
-      </TamaguiProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

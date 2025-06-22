@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useMemo } from 'react';
-import { ScrollView } from 'react-native';
-import { Stack, Text } from '@tamagui/core';
+import { ScrollView, View } from 'react-native';
+import { Text } from 'react-native-paper';
 import { Calendar, CheckCircle, Circle, TrendingUp, X } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -226,7 +226,8 @@ export const HomeScreen: React.FC = () => {
     return (
         <ScrollView
             ref={scrollViewRef}
-            style={{ flex: 1, padding: 20 }}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 60 }}
             onScroll={(event) => {
                 const offsetY = event.nativeEvent.contentOffset.y;
                 saveScrollPosition('home', offsetY);
@@ -238,29 +239,33 @@ export const HomeScreen: React.FC = () => {
                 title="Week Plan"
                 borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
             >
-                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                     <Calendar size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
-                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        marginLeft={8}
-                        fontSize={16}
+                        style={{
+                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            marginLeft: 8,
+                            fontSize: 16
+                        }}
                     >
                         Week 3 - Cycle 1
                     </Text>
-                </Stack>
+                </View>
 
                 {/* Today's Workout */}
                 {todaysWorkout && (
-                    <Stack gap={12} marginBottom={16}>
+                    <View style={{ gap: 12, marginBottom: 16 }}>
                         <Text
-                            fontSize={14}
-                            fontWeight="600"
-                            color={isDark ? COLORS.textDark : COLORS.text}
-                            marginBottom={8}
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                marginBottom: 8
+                            }}
                         >
                             Today
                         </Text>
-                        <Stack
+                        <View
                             style={{
                                 backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
                                 padding: 16,
@@ -269,11 +274,13 @@ export const HomeScreen: React.FC = () => {
                                 borderColor: isDark ? COLORS.primary : COLORS.primaryDark,
                             }}
                         >
-                            <Stack flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={8}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                 <Text
-                                    fontSize={16}
-                                    color={isDark ? COLORS.textDark : COLORS.text}
-                                    fontWeight="600"
+                                    style={{
+                                        fontSize: 16,
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        fontWeight: '600'
+                                    }}
                                 >
                                     {todaysWorkout.lift}
                                 </Text>
@@ -281,60 +288,71 @@ export const HomeScreen: React.FC = () => {
                                     label={todaysWorkout.day}
                                     variant={todaysWorkout.completed ? "success" : "primary"}
                                 />
-                            </Stack>
-                            <Stack marginBottom={12}>
+                            </View>
+                            <View style={{ marginBottom: 12 }}>
                                 <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                    style={{
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                    }}
                                 >
                                     Top Set: {todaysWorkout.topSet}
                                 </Text>
                                 <Text
-                                    fontSize={14}
-                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                    style={{
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                    }}
                                 >
                                     Weight: {todaysWorkout.weight}
                                 </Text>
                                 <Text
-                                    fontSize={12}
-                                    color={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
+                                    }}
                                 >
                                     {formatDate(todaysWorkout.date)}
                                 </Text>
-                            </Stack>
+                            </View>
                             {todaysWorkout.completed ? (
                                 <Text
-                                    fontSize={12}
-                                    color={COLORS.success}
-                                    fontWeight="500"
+                                    style={{
+                                        fontSize: 12,
+                                        color: COLORS.success,
+                                        fontWeight: '500'
+                                    }}
                                 >
                                     ✓ Completed
                                 </Text>
                             ) : (
                                 <Button
-                                    title="Start Workout"
                                     onPress={() => handleStartWorkout(todaysWorkout.lift)}
                                     variant="primary"
                                     fullWidth
-                                />
+                                >
+                                    Start Workout
+                                </Button>
                             )}
-                        </Stack>
-                    </Stack>
+                        </View>
+                    </View>
                 )}
 
                 {/* Upcoming Workouts */}
                 {upcomingWorkouts.length > 0 && (
-                    <Stack gap={12} marginBottom={16}>
+                    <View style={{ gap: 12, marginBottom: 16 }}>
                         <Text
-                            fontSize={14}
-                            fontWeight="600"
-                            color={isDark ? COLORS.textDark : COLORS.text}
-                            marginBottom={8}
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                marginBottom: 8
+                            }}
                         >
                             Upcoming
                         </Text>
                         {upcomingWorkouts.map((workout, index) => (
-                            <Stack
+                            <View
                                 key={index}
                                 style={{
                                     backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
@@ -344,11 +362,13 @@ export const HomeScreen: React.FC = () => {
                                     borderColor: isDark ? COLORS.borderDark : COLORS.border,
                                 }}
                             >
-                                <Stack flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={8}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                     <Text
-                                        fontSize={16}
-                                        color={isDark ? COLORS.textDark : COLORS.text}
-                                        fontWeight="600"
+                                        style={{
+                                            fontSize: 16,
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                            fontWeight: '600'
+                                        }}
                                     >
                                         {workout.lift}
                                     </Text>
@@ -356,51 +376,60 @@ export const HomeScreen: React.FC = () => {
                                         label={workout.day}
                                         variant="complementary"
                                     />
-                                </Stack>
-                                <Stack marginBottom={12}>
+                                </View>
+                                <View style={{ marginBottom: 12 }}>
                                     <Text
-                                        fontSize={14}
-                                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                        style={{
+                                            fontSize: 14,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                        }}
                                     >
                                         Top Set: {workout.topSet}
                                     </Text>
                                     <Text
-                                        fontSize={14}
-                                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                        style={{
+                                            fontSize: 14,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                        }}
                                     >
                                         Weight: {workout.weight}
                                     </Text>
                                     <Text
-                                        fontSize={12}
-                                        color={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
+                                        }}
                                     >
                                         {formatDate(workout.date)}
                                     </Text>
-                                </Stack>
+                                </View>
                                 <Button
-                                    title="Start Workout"
                                     onPress={() => handleStartWorkout(workout.lift)}
                                     variant="primary"
                                     fullWidth
-                                />
-                            </Stack>
+                                >
+                                    Start Workout
+                                </Button>
+                            </View>
                         ))}
-                    </Stack>
+                    </View>
                 )}
 
                 {/* Completed Workouts */}
                 {completedWorkouts.length > 0 && (
-                    <Stack gap={12}>
+                    <View style={{ gap: 12 }}>
                         <Text
-                            fontSize={14}
-                            fontWeight="600"
-                            color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                            marginBottom={8}
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                marginBottom: 8
+                            }}
                         >
                             Completed
                         </Text>
                         {completedWorkouts.map((workout, index) => (
-                            <Stack
+                            <View
                                 key={index}
                                 style={{
                                     backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
@@ -411,11 +440,13 @@ export const HomeScreen: React.FC = () => {
                                     opacity: 0.6,
                                 }}
                             >
-                                <Stack flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={8}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                     <Text
-                                        fontSize={16}
-                                        color={isDark ? COLORS.textDark : COLORS.text}
-                                        fontWeight="600"
+                                        style={{
+                                            fontSize: 16,
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                            fontWeight: '600'
+                                        }}
                                     >
                                         {workout.lift}
                                     </Text>
@@ -423,37 +454,45 @@ export const HomeScreen: React.FC = () => {
                                         label={workout.day}
                                         variant="success"
                                     />
-                                </Stack>
-                                <Stack marginBottom={12}>
+                                </View>
+                                <View style={{ marginBottom: 12 }}>
                                     <Text
-                                        fontSize={14}
-                                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                        style={{
+                                            fontSize: 14,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                        }}
                                     >
                                         Top Set: {workout.topSet}
                                     </Text>
                                     <Text
-                                        fontSize={14}
-                                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                        style={{
+                                            fontSize: 14,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                        }}
                                     >
                                         Weight: {workout.weight}
                                     </Text>
                                     <Text
-                                        fontSize={12}
-                                        color={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
+                                        }}
                                     >
                                         {formatDate(workout.date)}
                                     </Text>
-                                </Stack>
+                                </View>
                                 <Text
-                                    fontSize={12}
-                                    color={COLORS.success}
-                                    fontWeight="500"
+                                    style={{
+                                        fontSize: 12,
+                                        color: COLORS.success,
+                                        fontWeight: '500'
+                                    }}
                                 >
                                     ✓ Completed
                                 </Text>
-                            </Stack>
+                            </View>
                         ))}
-                    </Stack>
+                    </View>
                 )}
             </Card>
 
@@ -462,71 +501,81 @@ export const HomeScreen: React.FC = () => {
                 title="4-Week Cycle Overview"
                 borderColor={isDark ? COLORS.successLight : COLORS.success}
             >
-                <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
                     <Calendar size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
-                        color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
-                        marginLeft={8}
-                        fontSize={14}
+                        style={{
+                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            marginLeft: 8,
+                            fontSize: 14
+                        }}
                     >
                         Jim Wendler's 5/3/1 Program
                     </Text>
-                </Stack>
-                <Stack gap={16}>
+                </View>
+                <View style={{ gap: 16 }}>
                     {cycleOverview.map((week, index) => (
-                        <Stack key={index} gap={8}>
-                            <Stack flexDirection="row" justifyContent="space-between" alignItems="center">
-                                <Stack flexDirection="row" alignItems="center" flex={1}>
+                        <View key={index} style={{ gap: 8 }}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                                     {getStatusIcon(week.status)}
                                     <Text
-                                        fontSize={16}
-                                        color={getStatusColor(week.status)}
-                                        fontWeight="600"
-                                        marginLeft={8}
+                                        style={{
+                                            fontSize: 16,
+                                            color: getStatusColor(week.status),
+                                            fontWeight: '600',
+                                            marginLeft: 8
+                                        }}
                                     >
                                         {week.name}
                                     </Text>
-                                </Stack>
+                                </View>
                                 <Badge
                                     label={week.description}
                                     variant={week.status === 'completed' ? 'success' : week.status === 'current' ? 'primary' : 'complementary'}
                                 />
-                            </Stack>
-                            <Stack marginLeft={24} gap={6}>
+                            </View>
+                            <View style={{ marginLeft: 24, gap: 6 }}>
                                 {week.lifts.map((lift, liftIndex) => (
-                                    <Stack key={liftIndex} gap={4}>
-                                        <Stack flexDirection="row" alignItems="center" gap={8}>
+                                    <View key={liftIndex} style={{ gap: 4 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <Text
-                                                fontSize={14}
-                                                color={isDark ? COLORS.textDark : COLORS.text}
-                                                fontWeight="500"
+                                                style={{
+                                                    fontSize: 14,
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                    fontWeight: '500'
+                                                }}
                                             >
                                                 {lift.lift}
                                             </Text>
                                             {getPassFailIcon(lift.passed)}
-                                        </Stack>
-                                        <Stack marginLeft={8}>
+                                        </View>
+                                        <View style={{ marginLeft: 8 }}>
                                             <Text
-                                                fontSize={12}
-                                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                }}
                                             >
                                                 Top Set: {lift.topSet} @ {lift.weight}
                                             </Text>
                                             {lift.reps !== null && (
                                                 <Text
-                                                    fontSize={12}
-                                                    color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                    }}
                                                 >
                                                     Reps: {lift.reps}
                                                 </Text>
                                             )}
-                                        </Stack>
-                                    </Stack>
+                                        </View>
+                                    </View>
                                 ))}
-                            </Stack>
-                        </Stack>
+                            </View>
+                        </View>
                     ))}
-                </Stack>
+                </View>
             </Card>
         </ScrollView>
     );
