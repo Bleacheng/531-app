@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, Stack } from '@tamagui/core';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View, Text } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
@@ -25,54 +24,38 @@ export const Card: React.FC<CardProps> = ({
     const { theme } = useTheme();
     const isDark = theme === 'dark';
 
-    const defaultBorderColor = isDark ? COLORS.primaryLight : COLORS.primary;
-    const defaultBackgroundColor = isDark ? COLORS.backgroundSecondaryDark : COLORS.backgroundSecondary;
+    const CardContainer = onPress ? TouchableOpacity : View;
 
-    const cardContent = (
-        <View
-            backgroundColor={backgroundColor || defaultBackgroundColor}
-            padding={20}
-            borderRadius={16}
-            marginBottom={20}
-            borderWidth={2}
-            borderColor={borderColor || defaultBorderColor}
+    return (
+        <CardContainer
             style={{
-                shadowColor: borderColor || defaultBorderColor,
-                shadowOffset: { width: 0, height: 4 },
+                borderColor: borderColor || (isDark ? COLORS.borderDark : COLORS.border),
+                backgroundColor: backgroundColor || (isDark ? COLORS.backgroundSecondaryDark : COLORS.backgroundSecondary),
+                borderWidth: 1,
+                borderRadius: 12,
+                marginBottom: 16,
+                elevation: 2,
+                shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
-                shadowRadius: 8,
-                elevation: 4,
+                shadowRadius: 4,
             }}
+            onPress={onPress}
+            activeOpacity={onPress ? 0.8 : 1}
         >
-            <Stack flexDirection="row" alignItems="center" marginBottom={15}>
-                {Icon && (
-                    <View
-                        backgroundColor={borderColor || defaultBorderColor}
-                        width={8}
-                        height={24}
-                        borderRadius={4}
-                        marginRight={12}
-                    />
-                )}
-                <Text
-                    fontSize={20}
-                    fontWeight="bold"
-                    color={isDark ? COLORS.textDark : COLORS.text}
-                >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, padding: 16, paddingBottom: 8 }}>
+                {Icon && <Icon size={20} color={isDark ? COLORS.primaryLight : COLORS.primaryDark} style={{ marginRight: 8 }} />}
+                <Text style={{
+                    color: isDark ? COLORS.textDark : COLORS.text,
+                    fontWeight: 'bold',
+                    fontSize: 18,
+                    flex: 1
+                }}>
                     {title}
                 </Text>
-            </Stack>
-            {children}
-        </View>
+            </View>
+            <View style={{ padding: 16, paddingTop: 0 }}>
+                {children}
+            </View>
+        </CardContainer>
     );
-
-    if (onPress) {
-        return (
-            <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-                {cardContent}
-            </TouchableOpacity>
-        );
-    }
-
-    return cardContent;
 }; 

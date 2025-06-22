@@ -1,27 +1,31 @@
 import React from 'react';
-import { TouchableOpacity, Text } from 'react-native';
+import { TouchableOpacity, Text, ViewStyle, TextStyle } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
 
 interface ButtonProps {
-    title: string;
+    children: React.ReactNode;
     onPress: () => void;
     variant?: 'primary' | 'secondary' | 'outline';
     icon?: LucideIcon;
     iconPosition?: 'left' | 'right';
     disabled?: boolean;
     fullWidth?: boolean;
+    style?: ViewStyle;
+    textStyle?: TextStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
-    title,
+    children,
     onPress,
     variant = 'primary',
-    icon: Icon,
+    icon: IconComponent,
     iconPosition = 'left',
     disabled = false,
     fullWidth = false,
+    style,
+    textStyle,
 }) => {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
@@ -73,7 +77,7 @@ export const Button: React.FC<ButtonProps> = ({
 
     const getTextColor = () => {
         if (variant === 'outline') {
-            return isDark ? COLORS.secondaryLight : COLORS.secondary;
+            return isDark ? COLORS.textDark : COLORS.text;
         }
         return 'white';
     };
@@ -83,29 +87,32 @@ export const Button: React.FC<ButtonProps> = ({
 
     return (
         <TouchableOpacity
-            style={buttonStyles}
+            style={[buttonStyles, style]}
             onPress={onPress}
             disabled={disabled}
             activeOpacity={0.8}
         >
-            {Icon && iconPosition === 'left' && (
-                <Icon
+            {IconComponent && iconPosition === 'left' && (
+                <IconComponent
                     size={18}
                     color={textColor}
                     style={{ marginRight: 8 }}
                 />
             )}
             <Text
-                style={{
-                    color: textColor,
-                    fontWeight: 'bold',
-                    fontSize: 16
-                }}
+                style={[
+                    {
+                        color: textColor,
+                        fontWeight: 'bold',
+                        fontSize: 16,
+                    },
+                    textStyle
+                ]}
             >
-                {title}
+                {children}
             </Text>
-            {Icon && iconPosition === 'right' && (
-                <Icon
+            {IconComponent && iconPosition === 'right' && (
+                <IconComponent
                     size={18}
                     color={textColor}
                     style={{ marginLeft: 8 }}

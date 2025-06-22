@@ -10,8 +10,8 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ currentScreen, onNavigate }) => {
-    const { resolvedTheme } = useTheme();
-    const isDark = resolvedTheme === 'dark';
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
 
     const navItems = [
         {
