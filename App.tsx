@@ -64,7 +64,7 @@ const AppContent = () => {
           subtitle="App preferences"
         />
       )}
-      <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 10 }}>
+      <View style={{ flex: 1, paddingHorizontal: 20, paddingTop: 20 }}>
         {renderScreen()}
       </View>
       <Footer

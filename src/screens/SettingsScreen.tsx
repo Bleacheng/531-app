@@ -557,7 +557,8 @@ export const SettingsScreen: React.FC = () => {
                         flex: 1,
                         backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
                     }}
-                    contentContainerStyle={{ paddingBottom: 60 }}
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                    showsVerticalScrollIndicator={false}
                     onScroll={(event) => {
                         const offsetY = event.nativeEvent.contentOffset.y;
                         saveScrollPosition('settings', offsetY);
