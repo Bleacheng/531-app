@@ -52,6 +52,18 @@ const AppContent = () => {
           subtitle="Uh vro can i get uuuuuh"
         />
       )}
+      {currentScreen === 'profile' && (
+        <Header
+          title="History"
+          subtitle="Your workout progress"
+        />
+      )}
+      {currentScreen === 'settings' && (
+        <Header
+          title="Settings"
+          subtitle="App preferences"
+        />
+      )}
       <View style={{ flex: 1, paddingHorizontal: 20 }}>
         {renderScreen()}
       </View>

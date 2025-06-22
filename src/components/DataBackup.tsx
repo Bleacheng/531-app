@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Alert, Share, Platform, TouchableOpacity, View } from 'react-native';
 import Modal from 'react-native-modal';
 import { Text } from 'react-native-paper';
-import { Download, Upload, FileText, AlertTriangle, CheckCircle } from 'lucide-react-native';
+import { Download, Upload, FileText, AlertTriangle, CheckCircle, X } from 'lucide-react-native';
 import { Card } from './Card';
 import { Button } from './Button';
 import { useTheme } from '../contexts/ThemeContext';
@@ -211,7 +211,7 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
 
                     {/* Import Button */}
                     <View style={{ gap: 12 }}>
-                        <Button
+                        <TouchableOpacity
                             onPress={() => {
                                 // For this example, we'll simulate file selection
                                 // In a real app, you'd use a file picker library like react-native-document-picker
@@ -232,19 +232,44 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
                                     'plain-text'
                                 );
                             }}
-                            variant="outline"
-                            fullWidth
-                            icon={Upload}
+                            style={{
+                                backgroundColor: isDark ? COLORS.primaryLight : COLORS.primary,
+                                padding: 20,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 4,
+                                elevation: 4,
+                            }}
+                            activeOpacity={0.8}
                         >
-                            Paste JSON Data
-                        </Button>
-                        <Button
+                            <Upload size={32} color="white" />
+                            <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
+                                Import Data
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
                             onPress={() => setImportModalVisible(false)}
-                            variant="outline"
-                            fullWidth
+                            style={{
+                                backgroundColor: 'transparent',
+                                padding: 20,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                borderWidth: 2,
+                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                            }}
+                            activeOpacity={0.8}
                         >
-                            Cancel
-                        </Button>
+                            <X size={32} color={isDark ? COLORS.textDark : COLORS.text} />
+                            <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -398,23 +423,46 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
 
                     {/* Buttons */}
                     <View style={{ gap: 12 }}>
-                        <Button
+                        <TouchableOpacity
                             onPress={confirmImport}
-                            variant="outline"
-                            fullWidth
                             style={{
-                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                backgroundColor: isDark ? COLORS.error : COLORS.errorDark,
+                                padding: 20,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 4,
+                                elevation: 4,
                             }}
+                            activeOpacity={0.8}
                         >
-                            Import Data
-                        </Button>
-                        <Button
+                            <CheckCircle size={32} color="white" />
+                            <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
+                                Confirm Import
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
                             onPress={() => setImportData(null)}
-                            variant="outline"
-                            fullWidth
+                            style={{
+                                backgroundColor: 'transparent',
+                                padding: 20,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                borderWidth: 2,
+                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                            }}
+                            activeOpacity={0.8}
                         >
-                            Cancel
-                        </Button>
+                            <X size={32} color={isDark ? COLORS.textDark : COLORS.text} />
+                            <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
