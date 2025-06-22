@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TextInput, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { TextInput, TouchableOpacity, ScrollView, Modal, Alert } from 'react-native';
 import { Stack, Text } from '@tamagui/core';
-import { Palette, Scale, Calendar, TrendingUp, ChevronDown } from 'lucide-react-native';
+import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { DataBackup } from '../components/DataBackup';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
@@ -35,6 +36,7 @@ export const SettingsScreen: React.FC = () => {
     // Local state for modal
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
+    const [resetModalVisible, setResetModalVisible] = useState(false);
 
     const themeOptions = [
         { value: 'system' as const, label: 'System', description: 'Follow device settings' },
@@ -84,6 +86,57 @@ export const SettingsScreen: React.FC = () => {
         updateWorkoutDay(exercise, day);
         setModalVisible(false);
         setSelectedExercise(null);
+    };
+
+    const handleResetSettings = () => {
+        setResetModalVisible(true);
+    };
+
+    const confirmResetSettings = () => {
+        // Reset theme to system
+        setTheme('system');
+
+        // Reset unit to kg
+        setUnit('kg');
+
+        // Reset workout schedule to defaults
+        const defaultSchedule = {
+            benchPress: 'Monday',
+            squat: 'Tuesday',
+            deadlift: 'Thursday',
+            overheadPress: 'Friday',
+        };
+        // Note: We need to use the bulk update method since we're updating multiple exercises
+        Object.entries(defaultSchedule).forEach(([exercise, day]) => {
+            updateWorkoutDay(exercise as keyof typeof workoutSchedule, day);
+        });
+
+        // Reset exercise progression to defaults
+        const defaultProgression = {
+            benchPress: 2.5,
+            squat: 5,
+            deadlift: 5,
+            overheadPress: 2.5,
+        };
+        Object.entries(defaultProgression).forEach(([exercise, progression]) => {
+            updateExerciseProgression(exercise as keyof typeof exerciseProgression, progression);
+        });
+
+        // Update local state for progression inputs
+        setProgressionInputs({
+            benchPress: defaultProgression.benchPress.toString(),
+            squat: defaultProgression.squat.toString(),
+            deadlift: defaultProgression.deadlift.toString(),
+            overheadPress: defaultProgression.overheadPress.toString(),
+        });
+
+        setResetModalVisible(false);
+
+        Alert.alert(
+            'Settings Reset',
+            'All settings have been reset to their default values.',
+            [{ text: 'OK' }]
+        );
     };
 
     const getAvailableDays = (currentExercise: keyof typeof workoutSchedule) => {
@@ -305,6 +358,168 @@ export const SettingsScreen: React.FC = () => {
         );
     };
 
+    const renderResetSettingsModal = () => {
+        return (
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={resetModalVisible}
+                statusBarTranslucent={true}
+                onRequestClose={() => setResetModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 20,
+                    }}
+                    activeOpacity={1}
+                    onPress={() => setResetModalVisible(false)}
+                >
+                    <Stack
+                        style={{
+                            backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                            borderRadius: 12,
+                            padding: 20,
+                            width: '100%',
+                            maxWidth: 400,
+                            shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.3,
+                            shadowRadius: 8,
+                            elevation: 10,
+                        }}
+                        onStartShouldSetResponder={() => true}
+                    >
+                        {/* Header */}
+                        <Stack marginBottom={20}>
+                            <Stack flexDirection="row" alignItems="center" marginBottom={12}>
+                                <RotateCcw size={24} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    style={{
+                                        fontSize: 20,
+                                        fontWeight: 'bold',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        marginLeft: 8,
+                                    }}
+                                >
+                                    Reset All Settings
+                                </Text>
+                            </Stack>
+                            <Text
+                                style={{
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                This will reset all settings to their default values. This action cannot be undone.
+                            </Text>
+                        </Stack>
+
+                        {/* Warning */}
+                        <Stack
+                            style={{
+                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                                padding: 12,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                marginBottom: 16,
+                            }}
+                        >
+                            <Stack flexDirection="row" alignItems="center" marginBottom={4}>
+                                <AlertTriangle size={14} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    fontSize={12}
+                                    fontWeight="600"
+                                    color={isDark ? COLORS.error : COLORS.errorDark}
+                                    marginLeft={6}
+                                >
+                                    Alert
+                                </Text>
+                            </Stack>
+                            <Text
+                                fontSize={12}
+                                color={isDark ? COLORS.error : COLORS.errorDark}
+                            >
+                                This will reset your theme, units, workout schedule, and exercise progression to their default values. Your workout history and personal records will not be affected.
+                            </Text>
+                        </Stack>
+
+                        {/* What will be reset */}
+                        <Stack marginBottom={20}>
+                            <Text
+                                style={{
+                                    fontSize: 14,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                Settings that will be reset:
+                            </Text>
+                            <Stack gap={4}>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Theme: System (follow device settings)
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Units: Kilograms (kg)
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Workout Schedule: Default days
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Exercise Progression: Default values
+                                </Text>
+                            </Stack>
+                        </Stack>
+
+                        {/* Buttons */}
+                        <Stack gap={12}>
+                            <Button
+                                title="Reset All Settings"
+                                onPress={confirmResetSettings}
+                                variant="outline"
+                                fullWidth
+                                style={{
+                                    borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                }}
+                            />
+                            <Button
+                                title="Cancel"
+                                onPress={() => setResetModalVisible(false)}
+                                variant="outline"
+                                fullWidth
+                            />
+                        </Stack>
+                    </Stack>
+                </TouchableOpacity>
+            </Modal>
+        );
+    };
+
     return (
         <>
             <Stack style={{ flex: 1 }}>
@@ -482,10 +697,80 @@ export const SettingsScreen: React.FC = () => {
                             ))}
                         </Stack>
                     </Card>
+
+                    {/* Data Backup & Restore */}
+                    <DataBackup
+                        onDataImported={() => {
+                            // Reload settings after import
+                            // This would typically trigger a context reload
+                            console.log('Data imported successfully');
+                        }}
+                    />
+
+                    {/* Reset Settings */}
+                    <Card
+                        title="Reset Settings"
+                        borderColor={isDark ? COLORS.errorLight : COLORS.error}
+                    >
+                        <Stack flexDirection="row" alignItems="center" marginBottom={15}>
+                            <RotateCcw size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                            <Text
+                                color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                marginLeft={8}
+                                fontSize={14}
+                            >
+                                Reset all settings to their default values
+                            </Text>
+                        </Stack>
+
+                        {/* Warning */}
+                        <Stack
+                            style={{
+                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                                padding: 12,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                marginBottom: 16,
+                            }}
+                        >
+                            <Stack flexDirection="row" alignItems="center" marginBottom={4}>
+                                <AlertTriangle size={14} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    fontSize={12}
+                                    fontWeight="600"
+                                    color={isDark ? COLORS.error : COLORS.errorDark}
+                                    marginLeft={6}
+                                >
+                                    Alert
+                                </Text>
+                            </Stack>
+                            <Text
+                                fontSize={12}
+                                color={isDark ? COLORS.error : COLORS.errorDark}
+                            >
+                                This will reset your theme, units, workout schedule, and exercise progression to their default values. Your workout history and personal records will not be affected.
+                            </Text>
+                        </Stack>
+
+                        <Button
+                            title="Reset All Settings"
+                            onPress={handleResetSettings}
+                            variant="outline"
+                            fullWidth
+                            style={{
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                            }}
+                            textStyle={{
+                                color: isDark ? COLORS.error : COLORS.errorDark,
+                            }}
+                        />
+                    </Card>
                 </ScrollView>
             </Stack>
 
             {renderDaySelectorModal()}
+            {renderResetSettingsModal()}
         </>
     );
 }; 

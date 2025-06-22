@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text } from 'react-native';
+import { TouchableOpacity, Text, ViewStyle, TextStyle } from 'react-native';
 import { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
@@ -12,6 +12,8 @@ interface ButtonProps {
     iconPosition?: 'left' | 'right';
     disabled?: boolean;
     fullWidth?: boolean;
+    style?: ViewStyle;
+    textStyle?: TextStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -22,6 +24,8 @@ export const Button: React.FC<ButtonProps> = ({
     iconPosition = 'left',
     disabled = false,
     fullWidth = false,
+    style,
+    textStyle,
 }) => {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
@@ -83,7 +87,7 @@ export const Button: React.FC<ButtonProps> = ({
 
     return (
         <TouchableOpacity
-            style={buttonStyles}
+            style={[buttonStyles, style]}
             onPress={onPress}
             disabled={disabled}
             activeOpacity={0.8}
@@ -91,23 +95,26 @@ export const Button: React.FC<ButtonProps> = ({
             {Icon && iconPosition === 'left' && (
                 <Icon
                     size={18}
-                    color={textColor}
+                    color={textStyle?.color || textColor}
                     style={{ marginRight: 8 }}
                 />
             )}
             <Text
-                style={{
-                    color: textColor,
-                    fontWeight: 'bold',
-                    fontSize: 16
-                }}
+                style={[
+                    {
+                        color: textStyle?.color || textColor,
+                        fontWeight: 'bold',
+                        fontSize: 16
+                    },
+                    textStyle
+                ]}
             >
                 {title}
             </Text>
             {Icon && iconPosition === 'right' && (
                 <Icon
                     size={18}
-                    color={textColor}
+                    color={textStyle?.color || textColor}
                     style={{ marginLeft: 8 }}
                 />
             )}
