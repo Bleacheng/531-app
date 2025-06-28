@@ -74,6 +74,21 @@ interface ScrollPositions {
     settings: number;
 }
 
+interface WorkoutStatus {
+    exercise: keyof WorkoutSchedule;
+    cycle: number;
+    week: number;
+    scheduledDate: string; // ISO date string
+    status: 'upcoming' | 'today' | 'completed' | 'missed';
+    completedDate?: string; // ISO date string when completed
+    reps?: number; // Reps achieved on final set
+    weight?: string; // Weight used
+}
+
+interface WorkoutHistory {
+    workouts: WorkoutStatus[];
+}
+
 interface SettingsContextType {
     unit: Unit;
     setUnit: (unit: Unit) => void;
@@ -126,6 +141,12 @@ interface SettingsContextType {
         week: number;
         isDeloadWeek: boolean;
     };
+    // Workout Status Management
+    workoutHistory: WorkoutHistory;
+    completeWorkout: (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string) => void;
+    markWorkoutAsMissed: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => void;
+    getWorkoutStatus: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => WorkoutStatus | null;
+    updateWorkoutStatuses: () => void;
 }
 
 const defaultSchedule: WorkoutSchedule = {
@@ -225,6 +246,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const [isLoading, setIsLoading] = useState(true);
     const [currentCycle, setCurrentCycle] = useState(1);
     const [currentWeek, setCurrentWeek] = useState(1);
+    const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistory>({ workouts: [] });
 
     // Load settings from AsyncStorage on app start
     useEffect(() => {
@@ -233,7 +255,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData, workoutHistoryData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
@@ -244,6 +266,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
                 AsyncStorage.getItem('settings_scrollPositions'),
                 AsyncStorage.getItem('workout_currentCycle'),
                 AsyncStorage.getItem('workout_currentWeek'),
+                AsyncStorage.getItem('workout_history'),
             ]);
 
             if (unitData) {
@@ -275,6 +298,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (weekData) {
                 setCurrentWeek(JSON.parse(weekData));
+            }
+            if (workoutHistoryData) {
+                setWorkoutHistory(JSON.parse(workoutHistoryData));
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -599,6 +625,103 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         };
     };
 
+    // Save workout history
+    const saveWorkoutHistory = async (history: WorkoutHistory) => {
+        try {
+            await AsyncStorage.setItem('workout_history', JSON.stringify(history));
+            setWorkoutHistory(history);
+        } catch (error) {
+            console.error('Error saving workout history:', error);
+        }
+    };
+
+    // Complete a workout
+    const completeWorkout = async (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string) => {
+        const today = new Date().toISOString().split('T')[0];
+        const workoutKey = `${exercise}_${cycle}_${week}`;
+
+        const existingWorkoutIndex = workoutHistory.workouts.findIndex(
+            w => w.exercise === exercise && w.cycle === cycle && w.week === week
+        );
+
+        const completedWorkout: WorkoutStatus = {
+            exercise,
+            cycle,
+            week,
+            scheduledDate: today,
+            status: 'completed',
+            completedDate: today,
+            reps,
+            weight
+        };
+
+        let newWorkouts = [...workoutHistory.workouts];
+        if (existingWorkoutIndex >= 0) {
+            newWorkouts[existingWorkoutIndex] = completedWorkout;
+        } else {
+            newWorkouts.push(completedWorkout);
+        }
+
+        await saveWorkoutHistory({ workouts: newWorkouts });
+    };
+
+    // Mark a workout as missed
+    const markWorkoutAsMissed = async (exercise: keyof WorkoutSchedule, cycle: number, week: number) => {
+        const today = new Date().toISOString().split('T')[0];
+
+        const existingWorkoutIndex = workoutHistory.workouts.findIndex(
+            w => w.exercise === exercise && w.cycle === cycle && w.week === week
+        );
+
+        const missedWorkout: WorkoutStatus = {
+            exercise,
+            cycle,
+            week,
+            scheduledDate: today,
+            status: 'missed'
+        };
+
+        let newWorkouts = [...workoutHistory.workouts];
+        if (existingWorkoutIndex >= 0) {
+            newWorkouts[existingWorkoutIndex] = missedWorkout;
+        } else {
+            newWorkouts.push(missedWorkout);
+        }
+
+        await saveWorkoutHistory({ workouts: newWorkouts });
+    };
+
+    // Get workout status
+    const getWorkoutStatus = (exercise: keyof WorkoutSchedule, cycle: number, week: number): WorkoutStatus | null => {
+        return workoutHistory.workouts.find(
+            w => w.exercise === exercise && w.cycle === cycle && w.week === week
+        ) || null;
+    };
+
+    // Update workout statuses based on current date
+    const updateWorkoutStatuses = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        const todayDate = new Date(today);
+
+        let updated = false;
+        const newWorkouts = [...workoutHistory.workouts];
+
+        // Check for missed workouts (scheduled date is in the past and not completed)
+        newWorkouts.forEach((workout, index) => {
+            if (workout.status === 'upcoming' || workout.status === 'today') {
+                const scheduledDate = new Date(workout.scheduledDate);
+                if (scheduledDate < todayDate) {
+                    newWorkouts[index] = { ...workout, status: 'missed' };
+                    updated = true;
+                }
+            }
+        });
+
+        if (updated) {
+            await saveWorkoutHistory({ workouts: newWorkouts });
+        }
+    };
+
     const value = {
         unit,
         setUnit: saveUnit,
@@ -642,6 +765,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         startNewCycle,
         advanceToNextWeek,
         getCurrentCycleData,
+        // Workout Status Management
+        workoutHistory,
+        completeWorkout,
+        markWorkoutAsMissed,
+        getWorkoutStatus,
+        updateWorkoutStatuses,
     };
 
     return (
