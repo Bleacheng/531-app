@@ -17,6 +17,41 @@ interface ExerciseProgression {
     overheadPress: number;
 }
 
+// 5/3/1 Program Settings
+interface OneRepMax {
+    benchPress: number;
+    squat: number;
+    deadlift: number;
+    overheadPress: number;
+}
+
+interface TrainingMaxPercentage {
+    percentage: number;
+}
+
+interface WorkingSetPercentages {
+    week1: {
+        set1: number; // 65%
+        set2: number; // 75%
+        set3: number; // 85%
+    };
+    week2: {
+        set1: number; // 70%
+        set2: number; // 80%
+        set3: number; // 90%
+    };
+    week3: {
+        set1: number; // 75%
+        set2: number; // 85%
+        set3: number; // 95%
+    };
+    week4: {
+        set1: number; // 40%
+        set2: number; // 50%
+        set3: number; // 60%
+    };
+}
+
 interface ScrollPositions {
     home: number;
     history: number;
@@ -35,6 +70,16 @@ interface SettingsContextType {
     exerciseProgression: ExerciseProgression;
     setExerciseProgression: (progression: ExerciseProgression) => void;
     updateExerciseProgression: (exercise: keyof ExerciseProgression, progression: number) => void;
+    // 5/3/1 Program Settings
+    oneRepMax: OneRepMax;
+    setOneRepMax: (oneRepMax: OneRepMax) => void;
+    updateOneRepMax: (exercise: keyof OneRepMax, weight: number) => void;
+    trainingMaxPercentage: TrainingMaxPercentage;
+    setTrainingMaxPercentage: (percentage: TrainingMaxPercentage) => void;
+    updateTrainingMaxPercentage: (percentage: number) => void;
+    workingSetPercentages: WorkingSetPercentages;
+    setWorkingSetPercentages: (percentages: WorkingSetPercentages) => void;
+    updateWorkingSetPercentages: (week: keyof WorkingSetPercentages, set: keyof WorkingSetPercentages['week1'], percentage: number) => void;
     scrollPositions: ScrollPositions;
     saveScrollPosition: (screen: keyof ScrollPositions, position: number) => void;
     getScrollPosition: (screen: keyof ScrollPositions) => number;
@@ -53,6 +98,41 @@ const defaultProgression: ExerciseProgression = {
     squat: 5,
     deadlift: 5,
     overheadPress: 2.5,
+};
+
+// Default 5/3/1 Program Settings
+const defaultOneRepMax: OneRepMax = {
+    benchPress: 100,
+    squat: 140,
+    deadlift: 180,
+    overheadPress: 70,
+};
+
+const defaultTrainingMaxPercentage: TrainingMaxPercentage = {
+    percentage: 90,
+};
+
+const defaultWorkingSetPercentages: WorkingSetPercentages = {
+    week1: {
+        set1: 65,
+        set2: 75,
+        set3: 85,
+    },
+    week2: {
+        set1: 70,
+        set2: 80,
+        set3: 90,
+    },
+    week3: {
+        set1: 75,
+        set2: 85,
+        set3: 95,
+    },
+    week4: {
+        set1: 40,
+        set2: 50,
+        set3: 60,
+    },
 };
 
 const defaultScrollPositions: ScrollPositions = {
@@ -79,6 +159,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const [unit, setUnit] = useState<Unit>('kg');
     const [workoutSchedule, setWorkoutSchedule] = useState<WorkoutSchedule>(defaultSchedule);
     const [exerciseProgression, setExerciseProgression] = useState<ExerciseProgression>(defaultProgression);
+    const [oneRepMax, setOneRepMax] = useState<OneRepMax>(defaultOneRepMax);
+    const [trainingMaxPercentage, setTrainingMaxPercentage] = useState<TrainingMaxPercentage>(defaultTrainingMaxPercentage);
+    const [workingSetPercentages, setWorkingSetPercentages] = useState<WorkingSetPercentages>(defaultWorkingSetPercentages);
     const [scrollPositions, setScrollPositions] = useState<ScrollPositions>(defaultScrollPositions);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -89,10 +172,13 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData, scrollData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, scrollData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
+                AsyncStorage.getItem('settings_oneRepMax'),
+                AsyncStorage.getItem('settings_trainingMaxPercentage'),
+                AsyncStorage.getItem('settings_workingSetPercentages'),
                 AsyncStorage.getItem('settings_scrollPositions'),
             ]);
 
@@ -104,6 +190,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (progressionData) {
                 setExerciseProgression(JSON.parse(progressionData));
+            }
+            if (oneRepMaxData) {
+                setOneRepMax(JSON.parse(oneRepMaxData));
+            }
+            if (trainingMaxData) {
+                setTrainingMaxPercentage(JSON.parse(trainingMaxData));
+            }
+            if (workingSetData) {
+                setWorkingSetPercentages(JSON.parse(workingSetData));
             }
             if (scrollData) {
                 setScrollPositions(JSON.parse(scrollData));
@@ -142,6 +237,36 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             setExerciseProgression(progression);
         } catch (error) {
             console.error('Error saving exercise progression:', error);
+        }
+    };
+
+    // Save 1RM
+    const saveOneRepMax = async (oneRepMax: OneRepMax) => {
+        try {
+            await AsyncStorage.setItem('settings_oneRepMax', JSON.stringify(oneRepMax));
+            setOneRepMax(oneRepMax);
+        } catch (error) {
+            console.error('Error saving 1RM:', error);
+        }
+    };
+
+    // Save training max percentage
+    const saveTrainingMaxPercentage = async (percentage: TrainingMaxPercentage) => {
+        try {
+            await AsyncStorage.setItem('settings_trainingMaxPercentage', JSON.stringify(percentage));
+            setTrainingMaxPercentage(percentage);
+        } catch (error) {
+            console.error('Error saving training max percentage:', error);
+        }
+    };
+
+    // Save working set percentages
+    const saveWorkingSetPercentages = async (percentages: WorkingSetPercentages) => {
+        try {
+            await AsyncStorage.setItem('settings_workingSetPercentages', JSON.stringify(percentages));
+            setWorkingSetPercentages(percentages);
+        } catch (error) {
+            console.error('Error saving working set percentages:', error);
         }
     };
 
@@ -207,6 +332,32 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         saveExerciseProgression(newProgression);
     };
 
+    // Update 1RM for a specific exercise
+    const updateOneRepMax = (exercise: keyof OneRepMax, weight: number) => {
+        const newOneRepMax = {
+            ...oneRepMax,
+            [exercise]: weight
+        };
+        saveOneRepMax(newOneRepMax);
+    };
+
+    // Update training max percentage for a specific exercise
+    const updateTrainingMaxPercentage = (percentage: number) => {
+        saveTrainingMaxPercentage({ percentage });
+    };
+
+    // Update working set percentages for a specific week and set
+    const updateWorkingSetPercentages = (week: keyof WorkingSetPercentages, set: keyof WorkingSetPercentages['week1'], percentage: number) => {
+        const newPercentages = {
+            ...workingSetPercentages,
+            [week]: {
+                ...workingSetPercentages[week],
+                [set]: percentage
+            }
+        };
+        saveWorkingSetPercentages(newPercentages);
+    };
+
     const saveScrollPosition = (screen: keyof ScrollPositions, position: number) => {
         const newPositions = {
             ...scrollPositions,
@@ -231,6 +382,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         exerciseProgression,
         setExerciseProgression: saveExerciseProgression,
         updateExerciseProgression,
+        // 5/3/1 Program Settings
+        oneRepMax,
+        setOneRepMax: saveOneRepMax,
+        updateOneRepMax,
+        trainingMaxPercentage,
+        setTrainingMaxPercentage: saveTrainingMaxPercentage,
+        updateTrainingMaxPercentage,
+        workingSetPercentages,
+        setWorkingSetPercentages: saveWorkingSetPercentages,
+        updateWorkingSetPercentages,
         scrollPositions,
         saveScrollPosition,
         getScrollPosition,

@@ -12,7 +12,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const SettingsScreen: React.FC = () => {
     const { theme, setTheme } = useTheme();
-    const { unit, setUnit, formatWeight, workoutSchedule, updateWorkoutDay, exerciseProgression, updateExerciseProgression, saveScrollPosition, getScrollPosition } = useSettings();
+    const {
+        unit,
+        setUnit,
+        formatWeight,
+        workoutSchedule,
+        updateWorkoutDay,
+        exerciseProgression,
+        updateExerciseProgression,
+        oneRepMax,
+        updateOneRepMax,
+        trainingMaxPercentage,
+        updateTrainingMaxPercentage,
+        workingSetPercentages,
+        updateWorkingSetPercentages,
+        saveScrollPosition,
+        getScrollPosition
+    } = useSettings();
     const isDark = theme === 'dark';
 
     // Scroll position remembering
@@ -34,11 +50,29 @@ export const SettingsScreen: React.FC = () => {
         overheadPress: exerciseProgression.overheadPress.toString(),
     });
 
+    // Local state for 1RM inputs
+    const [oneRepMaxInputs, setOneRepMaxInputs] = useState({
+        benchPress: oneRepMax.benchPress.toString(),
+        squat: oneRepMax.squat.toString(),
+        deadlift: oneRepMax.deadlift.toString(),
+        overheadPress: oneRepMax.overheadPress.toString(),
+    });
+
+    // Training max percentage options (80% to 100% in 5% increments)
+    const trainingMaxOptions = [
+        { value: 80, label: '80%' },
+        { value: 85, label: '85%' },
+        { value: 90, label: '90%' },
+        { value: 95, label: '95%' },
+        { value: 100, label: '100%' },
+    ];
+
     // Local state for modals
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
     const [resetSettingsModalVisible, setResetSettingsModalVisible] = useState(false);
     const [resetDataModalVisible, setResetDataModalVisible] = useState(false);
+    const [trainingMaxModalVisible, setTrainingMaxModalVisible] = useState(false);
 
     const themeOptions = [
         { value: 'light' as const, label: 'Light', description: 'Always use light theme' },
@@ -83,10 +117,38 @@ export const SettingsScreen: React.FC = () => {
         }
     };
 
+    // Handle 1RM changes
+    const handleOneRepMaxChange = (exercise: keyof typeof oneRepMax, value: string) => {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0) {
+            updateOneRepMax(exercise, numValue);
+        }
+        setOneRepMaxInputs(prev => ({
+            ...prev,
+            [exercise]: value
+        }));
+    };
+
+    const handleOneRepMaxBlur = (exercise: keyof typeof oneRepMax) => {
+        const numValue = parseFloat(oneRepMaxInputs[exercise]);
+        if (isNaN(numValue) || numValue <= 0) {
+            // Reset to current value if invalid
+            setOneRepMaxInputs(prev => ({
+                ...prev,
+                [exercise]: oneRepMax[exercise].toString()
+            }));
+        }
+    };
+
     const handleDaySelect = (exercise: keyof typeof workoutSchedule, day: string) => {
         updateWorkoutDay(exercise, day);
         setModalVisible(false);
         setSelectedExercise(null);
+    };
+
+    const handleTrainingMaxSelect = (percentage: number) => {
+        updateTrainingMaxPercentage(percentage);
+        setTrainingMaxModalVisible(false);
     };
 
     const handleResetSettings = () => {
@@ -127,12 +189,37 @@ export const SettingsScreen: React.FC = () => {
             updateExerciseProgression(exercise as keyof typeof exerciseProgression, progression);
         });
 
+        // Reset 1RM to defaults
+        const defaultOneRepMax = {
+            benchPress: 100,
+            squat: 140,
+            deadlift: 180,
+            overheadPress: 70,
+        };
+        Object.entries(defaultOneRepMax).forEach(([exercise, weight]) => {
+            updateOneRepMax(exercise as keyof typeof oneRepMax, weight);
+        });
+
+        // Reset training max percentage to defaults
+        const defaultTrainingMax = {
+            percentage: 90,
+        };
+        updateTrainingMaxPercentage(defaultTrainingMax.percentage);
+
         // Update local state for progression inputs
         setProgressionInputs({
             benchPress: defaultProgression.benchPress.toString(),
             squat: defaultProgression.squat.toString(),
             deadlift: defaultProgression.deadlift.toString(),
             overheadPress: defaultProgression.overheadPress.toString(),
+        });
+
+        // Update local state for 1RM inputs
+        setOneRepMaxInputs({
+            benchPress: defaultOneRepMax.benchPress.toString(),
+            squat: defaultOneRepMax.squat.toString(),
+            deadlift: defaultOneRepMax.deadlift.toString(),
+            overheadPress: defaultOneRepMax.overheadPress.toString(),
         });
 
         setResetSettingsModalVisible(false);
@@ -763,6 +850,116 @@ export const SettingsScreen: React.FC = () => {
         );
     };
 
+    const renderTrainingMaxModal = () => {
+        return (
+            <Modal
+                isVisible={trainingMaxModalVisible}
+                onBackdropPress={() => setTrainingMaxModalVisible(false)}
+                style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 20,
+                }}
+            >
+                <View
+                    style={{
+                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                        borderRadius: 12,
+                        padding: 20,
+                        width: '100%',
+                        maxWidth: 400,
+                        shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 10,
+                    }}
+                >
+                    {/* Header */}
+                    <View style={{ marginBottom: 20 }}>
+                        <Text
+                            style={{
+                                fontSize: 20,
+                                fontWeight: 'bold',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                textAlign: 'center',
+                            }}
+                        >
+                            Select Training Max Percentage
+                        </Text>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                textAlign: 'center',
+                                marginTop: 8,
+                            }}
+                        >
+                            Choose the percentage of your 1RM to use as training max
+                        </Text>
+                    </View>
+
+                    {/* Options */}
+                    <View style={{ gap: 8 }}>
+                        {trainingMaxOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option.value}
+                                onPress={() => handleTrainingMaxSelect(option.value)}
+                                style={{
+                                    backgroundColor: trainingMaxPercentage.percentage === option.value
+                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                        : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                    borderWidth: 1,
+                                    borderColor: trainingMaxPercentage.percentage === option.value
+                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                        : (isDark ? COLORS.borderDark : COLORS.border),
+                                    borderRadius: 8,
+                                    padding: 16,
+                                    alignItems: 'center',
+                                }}
+                                activeOpacity={0.8}
+                            >
+                                <Text
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: '600',
+                                        color: trainingMaxPercentage.percentage === option.value
+                                            ? 'white'
+                                            : (isDark ? COLORS.textDark : COLORS.text),
+                                    }}
+                                >
+                                    {option.label}
+                                </Text>
+                                {trainingMaxPercentage.percentage === option.value && (
+                                    <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {/* Cancel Button */}
+                    <TouchableOpacity
+                        onPress={() => setTrainingMaxModalVisible(false)}
+                        style={{
+                            backgroundColor: 'transparent',
+                            padding: 16,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            marginTop: 16,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: '600' }}>
+                            Cancel
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
+        );
+    };
+
     return (
         <>
             <View style={{ flex: 1 }}>
@@ -952,6 +1149,192 @@ export const SettingsScreen: React.FC = () => {
                         </View>
                     </Card>
 
+                    {/* 5/3/1 Program Settings */}
+                    <Card
+                        title="5/3/1 Program Settings"
+                        borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                            <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
+                            >
+                                Configure your 5/3/1 program parameters
+                            </Text>
+                        </View>
+
+                        {/* 1RM Settings */}
+                        <View style={{ marginBottom: 20 }}>
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                1 Rep Max (1RM)
+                            </Text>
+                            <View style={{ gap: 12 }}>
+                                {Object.entries(exerciseNames).map(([key, name]) => (
+                                    <View key={key} style={{ gap: 8 }}>
+                                        <Text
+                                            style={{
+                                                fontSize: 14,
+                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            }}
+                                        >
+                                            {name}
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <TextInput
+                                                value={oneRepMaxInputs[key as keyof typeof oneRepMaxInputs]}
+                                                onChangeText={(value) => handleOneRepMaxChange(key as keyof typeof oneRepMax, value)}
+                                                onBlur={() => handleOneRepMaxBlur(key as keyof typeof oneRepMax)}
+                                                keyboardType="numeric"
+                                                style={{
+                                                    flex: 1,
+                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                    borderWidth: 1,
+                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                    borderRadius: 8,
+                                                    padding: 12,
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                    fontSize: 16,
+                                                }}
+                                                placeholder="100"
+                                                placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                            />
+                                            <Text
+                                                style={{
+                                                    fontSize: 14,
+                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                    minWidth: 30,
+                                                }}
+                                            >
+                                                {unit}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Training Max Percentage Settings */}
+                        <View style={{ marginBottom: 20 }}>
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Training Max Percentage
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Percentage of 1RM used as training max for all exercises (typically 85-90%)
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setTrainingMaxModalVisible(true)}
+                                style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    borderWidth: 1,
+                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                    borderRadius: 8,
+                                    padding: 12,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                }}
+                            >
+                                <View style={{ flex: 1 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 16,
+                                            fontWeight: '500',
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                        }}
+                                    >
+                                        {trainingMaxPercentage.percentage}%
+                                    </Text>
+                                </View>
+                                <ChevronDown size={20} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Working Set Percentages Info */}
+                        <View>
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Working Set Percentages
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                These are the standard 5/3/1 percentages and cannot be modified:
+                            </Text>
+                            <View style={{ gap: 8 }}>
+                                <View style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    padding: 12,
+                                    borderRadius: 8
+                                }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                        Week 1 (5/5/5+): 65% × 5, 75% × 5, 85% × 5+
+                                    </Text>
+                                </View>
+                                <View style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    padding: 12,
+                                    borderRadius: 8
+                                }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                        Week 2 (3/3/3+): 70% × 3, 80% × 3, 90% × 3+
+                                    </Text>
+                                </View>
+                                <View style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    padding: 12,
+                                    borderRadius: 8
+                                }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                        Week 3 (5/3/1+): 75% × 5, 85% × 3, 95% × 1+
+                                    </Text>
+                                </View>
+                                <View style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    padding: 12,
+                                    borderRadius: 8
+                                }}>
+                                    <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                        Week 4 (Deload): 40% × 5, 50% × 5, 60% × 5
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </Card>
+
                     {/* Data Backup & Restore */}
                     <DataBackup
                         onDataImported={() => {
@@ -1057,6 +1440,7 @@ export const SettingsScreen: React.FC = () => {
             {renderDaySelectorModal()}
             {renderResetSettingsModal()}
             {renderResetDataModal()}
+            {renderTrainingMaxModal()}
         </>
     );
 }; 
