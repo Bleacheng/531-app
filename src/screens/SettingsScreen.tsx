@@ -26,6 +26,9 @@ export const SettingsScreen: React.FC = () => {
         updateTrainingMaxPercentage,
         workingSetPercentages,
         updateWorkingSetPercentages,
+        warmupSets,
+        updateWarmupSet,
+        toggleWarmupEnabled,
         saveScrollPosition,
         getScrollPosition
     } = useSettings();
@@ -56,6 +59,16 @@ export const SettingsScreen: React.FC = () => {
         squat: oneRepMax.squat.toString(),
         deadlift: oneRepMax.deadlift.toString(),
         overheadPress: oneRepMax.overheadPress.toString(),
+    });
+
+    // Local state for warm-up inputs
+    const [warmupInputs, setWarmupInputs] = useState({
+        set1Percentage: warmupSets.set1.percentage.toString(),
+        set1Reps: warmupSets.set1.reps.toString(),
+        set2Percentage: warmupSets.set2.percentage.toString(),
+        set2Reps: warmupSets.set2.reps.toString(),
+        set3Percentage: warmupSets.set3.percentage.toString(),
+        set3Reps: warmupSets.set3.reps.toString(),
     });
 
     // Training max percentage options (80% to 100% in 5% increments)
@@ -151,6 +164,36 @@ export const SettingsScreen: React.FC = () => {
         setTrainingMaxModalVisible(false);
     };
 
+    // Handle warm-up changes
+    const handleWarmupChange = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps', value: string) => {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0) {
+            if (field === 'percentage' && numValue <= 100) {
+                updateWarmupSet(set, field, numValue);
+            } else if (field === 'reps') {
+                updateWarmupSet(set, field, numValue);
+            }
+        }
+        setWarmupInputs(prev => ({
+            ...prev,
+            [`${set}${field.charAt(0).toUpperCase() + field.slice(1)}`]: value
+        }));
+    };
+
+    const handleWarmupBlur = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps') => {
+        const inputKey = `${set}${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof typeof warmupInputs;
+        const numValue = parseFloat(warmupInputs[inputKey]);
+        const currentValue = field === 'percentage' ? warmupSets[set].percentage : warmupSets[set].reps;
+
+        if (isNaN(numValue) || numValue <= 0 || (field === 'percentage' && numValue > 100)) {
+            // Reset to current value if invalid
+            setWarmupInputs(prev => ({
+                ...prev,
+                [inputKey]: currentValue.toString()
+            }));
+        }
+    };
+
     const handleResetSettings = () => {
         setResetSettingsModalVisible(true);
     };
@@ -206,6 +249,24 @@ export const SettingsScreen: React.FC = () => {
         };
         updateTrainingMaxPercentage(defaultTrainingMax.percentage);
 
+        // Reset warm-up sets to defaults
+        const defaultWarmup = {
+            set1: { percentage: 40, reps: 5 },
+            set2: { percentage: 50, reps: 5 },
+            set3: { percentage: 60, reps: 3 },
+            enabled: true,
+        };
+        // Update each warm-up set
+        Object.entries(defaultWarmup.set1).forEach(([field, value]) => {
+            updateWarmupSet('set1', field as 'percentage' | 'reps', value);
+        });
+        Object.entries(defaultWarmup.set2).forEach(([field, value]) => {
+            updateWarmupSet('set2', field as 'percentage' | 'reps', value);
+        });
+        Object.entries(defaultWarmup.set3).forEach(([field, value]) => {
+            updateWarmupSet('set3', field as 'percentage' | 'reps', value);
+        });
+
         // Update local state for progression inputs
         setProgressionInputs({
             benchPress: defaultProgression.benchPress.toString(),
@@ -220,6 +281,16 @@ export const SettingsScreen: React.FC = () => {
             squat: defaultOneRepMax.squat.toString(),
             deadlift: defaultOneRepMax.deadlift.toString(),
             overheadPress: defaultOneRepMax.overheadPress.toString(),
+        });
+
+        // Update local state for warm-up inputs
+        setWarmupInputs({
+            set1Percentage: defaultWarmup.set1.percentage.toString(),
+            set1Reps: defaultWarmup.set1.reps.toString(),
+            set2Percentage: defaultWarmup.set2.percentage.toString(),
+            set2Reps: defaultWarmup.set2.reps.toString(),
+            set3Percentage: defaultWarmup.set3.percentage.toString(),
+            set3Reps: defaultWarmup.set3.reps.toString(),
         });
 
         setResetSettingsModalVisible(false);
@@ -1318,6 +1389,182 @@ export const SettingsScreen: React.FC = () => {
                                 </View>
                             </View>
                         </View>
+                    </Card>
+
+                    {/* Warm-up Settings */}
+                    <Card
+                        title="Warm-up Sets"
+                        borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                            <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
+                            >
+                                Configure warm-up sets for all exercises
+                            </Text>
+                        </View>
+
+                        {/* Enable/Disable Warm-ups */}
+                        <View style={{ marginBottom: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <Text
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                    }}
+                                >
+                                    Enable Warm-ups
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={toggleWarmupEnabled}
+                                    style={{
+                                        backgroundColor: warmupSets.enabled
+                                            ? (isDark ? COLORS.success : COLORS.successDark)
+                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                        borderWidth: 1,
+                                        borderColor: warmupSets.enabled
+                                            ? (isDark ? COLORS.success : COLORS.successDark)
+                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                        borderRadius: 20,
+                                        padding: 4,
+                                        width: 50,
+                                        height: 30,
+                                        justifyContent: 'center',
+                                        alignItems: warmupSets.enabled ? 'flex-end' : 'flex-start',
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <View
+                                        style={{
+                                            backgroundColor: 'white',
+                                            borderRadius: 12,
+                                            width: 22,
+                                            height: 22,
+                                            shadowOffset: { width: 0, height: 1 },
+                                            shadowOpacity: 0.2,
+                                            shadowRadius: 2,
+                                            elevation: 2,
+                                        }}
+                                    />
+                                </TouchableOpacity>
+                            </View>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                Warm-ups are automatically disabled during deload week (Week 4)
+                            </Text>
+                        </View>
+
+                        {/* Warm-up Sets Configuration */}
+                        {warmupSets.enabled && (
+                            <View>
+                                <Text
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        marginBottom: 12,
+                                    }}
+                                >
+                                    Warm-up Sets
+                                </Text>
+                                <View style={{ gap: 12 }}>
+                                    {[
+                                        { key: 'set1', label: 'Set 1' },
+                                        { key: 'set2', label: 'Set 2' },
+                                        { key: 'set3', label: 'Set 3' },
+                                    ].map(({ key, label }) => (
+                                        <View key={key} style={{ gap: 8 }}>
+                                            <Text
+                                                style={{
+                                                    fontSize: 14,
+                                                    fontWeight: '600',
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                }}
+                                            >
+                                                {label}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                            marginBottom: 4,
+                                                        }}
+                                                    >
+                                                        Percentage
+                                                    </Text>
+                                                    <TextInput
+                                                        value={warmupInputs[`${key}Percentage` as keyof typeof warmupInputs]}
+                                                        onChangeText={(value) => handleWarmupChange(key as 'set1' | 'set2' | 'set3', 'percentage', value)}
+                                                        onBlur={() => handleWarmupBlur(key as 'set1' | 'set2' | 'set3', 'percentage')}
+                                                        keyboardType="numeric"
+                                                        style={{
+                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                            borderWidth: 1,
+                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                            borderRadius: 8,
+                                                            padding: 12,
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            fontSize: 16,
+                                                        }}
+                                                        placeholder="40"
+                                                        placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                                    />
+                                                </View>
+                                                <Text
+                                                    style={{
+                                                        fontSize: 14,
+                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                        marginTop: 20,
+                                                    }}
+                                                >
+                                                    ×
+                                                </Text>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                            marginBottom: 4,
+                                                        }}
+                                                    >
+                                                        Reps
+                                                    </Text>
+                                                    <TextInput
+                                                        value={warmupInputs[`${key}Reps` as keyof typeof warmupInputs]}
+                                                        onChangeText={(value) => handleWarmupChange(key as 'set1' | 'set2' | 'set3', 'reps', value)}
+                                                        onBlur={() => handleWarmupBlur(key as 'set1' | 'set2' | 'set3', 'reps')}
+                                                        keyboardType="numeric"
+                                                        style={{
+                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                            borderWidth: 1,
+                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                            borderRadius: 8,
+                                                            padding: 12,
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            fontSize: 16,
+                                                        }}
+                                                        placeholder="5"
+                                                        placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                                    />
+                                                </View>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
                     </Card>
 
                     {/* Data Backup & Restore */}

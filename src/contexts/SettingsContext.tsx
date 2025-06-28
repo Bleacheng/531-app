@@ -52,6 +52,22 @@ interface WorkingSetPercentages {
     };
 }
 
+interface WarmupSets {
+    set1: {
+        percentage: number; // 40%
+        reps: number; // 5
+    };
+    set2: {
+        percentage: number; // 50%
+        reps: number; // 5
+    };
+    set3: {
+        percentage: number; // 60%
+        reps: number; // 3
+    };
+    enabled: boolean; // true for weeks 1-3, false for week 4
+}
+
 interface ScrollPositions {
     home: number;
     history: number;
@@ -80,6 +96,10 @@ interface SettingsContextType {
     workingSetPercentages: WorkingSetPercentages;
     setWorkingSetPercentages: (percentages: WorkingSetPercentages) => void;
     updateWorkingSetPercentages: (week: keyof WorkingSetPercentages, set: keyof WorkingSetPercentages['week1'], percentage: number) => void;
+    warmupSets: WarmupSets;
+    setWarmupSets: (warmupSets: WarmupSets) => void;
+    updateWarmupSet: (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps', value: number) => void;
+    toggleWarmupEnabled: () => void;
     scrollPositions: ScrollPositions;
     saveScrollPosition: (screen: keyof ScrollPositions, position: number) => void;
     getScrollPosition: (screen: keyof ScrollPositions) => number;
@@ -135,6 +155,22 @@ const defaultWorkingSetPercentages: WorkingSetPercentages = {
     },
 };
 
+const defaultWarmupSets: WarmupSets = {
+    set1: {
+        percentage: 40,
+        reps: 5,
+    },
+    set2: {
+        percentage: 50,
+        reps: 5,
+    },
+    set3: {
+        percentage: 60,
+        reps: 3,
+    },
+    enabled: true,
+};
+
 const defaultScrollPositions: ScrollPositions = {
     home: 0,
     history: 0,
@@ -162,6 +198,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const [oneRepMax, setOneRepMax] = useState<OneRepMax>(defaultOneRepMax);
     const [trainingMaxPercentage, setTrainingMaxPercentage] = useState<TrainingMaxPercentage>(defaultTrainingMaxPercentage);
     const [workingSetPercentages, setWorkingSetPercentages] = useState<WorkingSetPercentages>(defaultWorkingSetPercentages);
+    const [warmupSets, setWarmupSets] = useState<WarmupSets>(defaultWarmupSets);
     const [scrollPositions, setScrollPositions] = useState<ScrollPositions>(defaultScrollPositions);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -172,13 +209,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, scrollData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
                 AsyncStorage.getItem('settings_oneRepMax'),
                 AsyncStorage.getItem('settings_trainingMaxPercentage'),
                 AsyncStorage.getItem('settings_workingSetPercentages'),
+                AsyncStorage.getItem('settings_warmupSets'),
                 AsyncStorage.getItem('settings_scrollPositions'),
             ]);
 
@@ -199,6 +237,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (workingSetData) {
                 setWorkingSetPercentages(JSON.parse(workingSetData));
+            }
+            if (warmupData) {
+                setWarmupSets(JSON.parse(warmupData));
             }
             if (scrollData) {
                 setScrollPositions(JSON.parse(scrollData));
@@ -267,6 +308,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             setWorkingSetPercentages(percentages);
         } catch (error) {
             console.error('Error saving working set percentages:', error);
+        }
+    };
+
+    // Save warmup sets
+    const saveWarmupSets = async (warmupSets: WarmupSets) => {
+        try {
+            await AsyncStorage.setItem('settings_warmupSets', JSON.stringify(warmupSets));
+            setWarmupSets(warmupSets);
+        } catch (error) {
+            console.error('Error saving warmup sets:', error);
         }
     };
 
@@ -358,6 +409,27 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         saveWorkingSetPercentages(newPercentages);
     };
 
+    // Update warmup set for a specific set
+    const updateWarmupSet = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps', value: number) => {
+        const newWarmupSets = {
+            ...warmupSets,
+            [set]: {
+                ...warmupSets[set],
+                [field]: value
+            }
+        };
+        saveWarmupSets(newWarmupSets);
+    };
+
+    // Toggle warmup enabled for all sets
+    const toggleWarmupEnabled = () => {
+        const newWarmupSets = {
+            ...warmupSets,
+            enabled: !warmupSets.enabled
+        };
+        saveWarmupSets(newWarmupSets);
+    };
+
     const saveScrollPosition = (screen: keyof ScrollPositions, position: number) => {
         const newPositions = {
             ...scrollPositions,
@@ -392,6 +464,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         workingSetPercentages,
         setWorkingSetPercentages: saveWorkingSetPercentages,
         updateWorkingSetPercentages,
+        warmupSets,
+        setWarmupSets: saveWarmupSets,
+        updateWarmupSet,
+        toggleWarmupEnabled,
         scrollPositions,
         saveScrollPosition,
         getScrollPosition,
