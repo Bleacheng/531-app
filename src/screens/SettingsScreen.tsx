@@ -414,6 +414,10 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -546,6 +550,10 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -731,6 +739,10 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -916,6 +928,10 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
             >
                 <View
                     style={{
