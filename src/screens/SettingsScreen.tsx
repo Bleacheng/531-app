@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TextInput, TouchableOpacity, ScrollView, Alert, View, Text } from 'react-native';
+import { TouchableOpacity, ScrollView, Alert, View, Text } from 'react-native';
+import { TextInput } from 'react-native-paper';
 import Modal from 'react-native-modal';
 import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle, CheckCircle, X, Database, Settings } from 'lucide-react-native';
 import { Card } from '../components/Card';
@@ -50,60 +51,30 @@ export const SettingsScreen: React.FC = () => {
         }
     }, []);
 
-    // Update local state when context values change
-    useEffect(() => {
-        setProgressionInputs({
-            benchPress: exerciseProgression.benchPress.toString(),
-            squat: exerciseProgression.squat.toString(),
-            deadlift: exerciseProgression.deadlift.toString(),
-            overheadPress: exerciseProgression.overheadPress.toString(),
-        });
-    }, [exerciseProgression]);
-
-    useEffect(() => {
-        setOneRepMaxInputs({
-            benchPress: oneRepMax.benchPress.toString(),
-            squat: oneRepMax.squat.toString(),
-            deadlift: oneRepMax.deadlift.toString(),
-            overheadPress: oneRepMax.overheadPress.toString(),
-        });
-    }, [oneRepMax]);
-
-    useEffect(() => {
-        setWarmupInputs({
-            set1Percentage: warmupSets.set1.percentage.toString(),
-            set1Reps: warmupSets.set1.reps.toString(),
-            set2Percentage: warmupSets.set2.percentage.toString(),
-            set2Reps: warmupSets.set2.reps.toString(),
-            set3Percentage: warmupSets.set3.percentage.toString(),
-            set3Reps: warmupSets.set3.reps.toString(),
-        });
-    }, [warmupSets]);
-
-    // Local state for text inputs
+    // Local state for text inputs - only initialize once
     const [progressionInputs, setProgressionInputs] = useState({
-        benchPress: exerciseProgression.benchPress.toString(),
-        squat: exerciseProgression.squat.toString(),
-        deadlift: exerciseProgression.deadlift.toString(),
-        overheadPress: exerciseProgression.overheadPress.toString(),
+        benchPress: exerciseProgression.benchPress > 0 ? exerciseProgression.benchPress.toString() : '',
+        squat: exerciseProgression.squat > 0 ? exerciseProgression.squat.toString() : '',
+        deadlift: exerciseProgression.deadlift > 0 ? exerciseProgression.deadlift.toString() : '',
+        overheadPress: exerciseProgression.overheadPress > 0 ? exerciseProgression.overheadPress.toString() : '',
     });
 
-    // Local state for 1RM inputs
+    // Local state for 1RM inputs - only initialize once
     const [oneRepMaxInputs, setOneRepMaxInputs] = useState({
-        benchPress: oneRepMax.benchPress.toString(),
-        squat: oneRepMax.squat.toString(),
-        deadlift: oneRepMax.deadlift.toString(),
-        overheadPress: oneRepMax.overheadPress.toString(),
+        benchPress: oneRepMax.benchPress > 0 ? oneRepMax.benchPress.toString() : '',
+        squat: oneRepMax.squat > 0 ? oneRepMax.squat.toString() : '',
+        deadlift: oneRepMax.deadlift > 0 ? oneRepMax.deadlift.toString() : '',
+        overheadPress: oneRepMax.overheadPress > 0 ? oneRepMax.overheadPress.toString() : '',
     });
 
-    // Local state for warm-up inputs
+    // Local state for warm-up inputs - only initialize once
     const [warmupInputs, setWarmupInputs] = useState({
-        set1Percentage: warmupSets.set1.percentage.toString(),
-        set1Reps: warmupSets.set1.reps.toString(),
-        set2Percentage: warmupSets.set2.percentage.toString(),
-        set2Reps: warmupSets.set2.reps.toString(),
-        set3Percentage: warmupSets.set3.percentage.toString(),
-        set3Reps: warmupSets.set3.reps.toString(),
+        set1Percentage: warmupSets.set1.percentage > 0 ? warmupSets.set1.percentage.toString() : '',
+        set1Reps: warmupSets.set1.reps > 0 ? warmupSets.set1.reps.toString() : '',
+        set2Percentage: warmupSets.set2.percentage > 0 ? warmupSets.set2.percentage.toString() : '',
+        set2Reps: warmupSets.set2.reps > 0 ? warmupSets.set2.reps.toString() : '',
+        set3Percentage: warmupSets.set3.percentage > 0 ? warmupSets.set3.percentage.toString() : '',
+        set3Reps: warmupSets.set3.reps > 0 ? warmupSets.set3.reps.toString() : '',
     });
 
     // Training max percentage options (80% to 100% in 5% increments)
@@ -144,14 +115,17 @@ export const SettingsScreen: React.FC = () => {
     };
 
     const handleProgressionChange = (exercise: keyof typeof exerciseProgression, value: string) => {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue > 0) {
-            updateExerciseProgression(exercise, numValue);
-        }
+        // Always update local state
         setProgressionInputs(prev => ({
             ...prev,
             [exercise]: value
         }));
+
+        // Only update context if it's a valid number
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0) {
+            updateExerciseProgression(exercise, numValue);
+        }
     };
 
     const handleProgressionBlur = (exercise: keyof typeof exerciseProgression) => {
@@ -160,21 +134,24 @@ export const SettingsScreen: React.FC = () => {
             // Reset to current value if invalid
             setProgressionInputs(prev => ({
                 ...prev,
-                [exercise]: exerciseProgression[exercise].toString()
+                [exercise]: exerciseProgression[exercise] > 0 ? exerciseProgression[exercise].toString() : ''
             }));
         }
     };
 
     // Handle 1RM changes
     const handleOneRepMaxChange = (exercise: keyof typeof oneRepMax, value: string) => {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue) && numValue > 0) {
-            updateOneRepMax(exercise, numValue);
-        }
+        // Always update local state
         setOneRepMaxInputs(prev => ({
             ...prev,
             [exercise]: value
         }));
+
+        // Only update context if it's a valid number
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0) {
+            updateOneRepMax(exercise, numValue);
+        }
     };
 
     const handleOneRepMaxBlur = (exercise: keyof typeof oneRepMax) => {
@@ -183,7 +160,7 @@ export const SettingsScreen: React.FC = () => {
             // Reset to current value if invalid
             setOneRepMaxInputs(prev => ({
                 ...prev,
-                [exercise]: oneRepMax[exercise].toString()
+                [exercise]: oneRepMax[exercise] > 0 ? oneRepMax[exercise].toString() : ''
             }));
         }
     };
@@ -201,6 +178,13 @@ export const SettingsScreen: React.FC = () => {
 
     // Handle warm-up changes
     const handleWarmupChange = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps', value: string) => {
+        // Always update local state
+        setWarmupInputs(prev => ({
+            ...prev,
+            [`${set}${field.charAt(0).toUpperCase() + field.slice(1)}`]: value
+        }));
+
+        // Only update context if it's a valid number
         const numValue = parseFloat(value);
         if (!isNaN(numValue) && numValue > 0) {
             if (field === 'percentage' && numValue <= 100) {
@@ -209,10 +193,6 @@ export const SettingsScreen: React.FC = () => {
                 updateWarmupSet(set, field, numValue);
             }
         }
-        setWarmupInputs(prev => ({
-            ...prev,
-            [`${set}${field.charAt(0).toUpperCase() + field.slice(1)}`]: value
-        }));
     };
 
     const handleWarmupBlur = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps') => {
@@ -224,7 +204,7 @@ export const SettingsScreen: React.FC = () => {
             // Reset to current value if invalid
             setWarmupInputs(prev => ({
                 ...prev,
-                [inputKey]: currentValue.toString()
+                [inputKey]: currentValue > 0 ? currentValue.toString() : ''
             }));
         }
     };
@@ -244,38 +224,38 @@ export const SettingsScreen: React.FC = () => {
         // Reset unit to kg
         setUnit('kg');
 
-        // Reset workout schedule to defaults
-        const defaultSchedule = {
-            benchPress: 'Monday',
-            squat: 'Tuesday',
-            deadlift: 'Thursday',
-            overheadPress: 'Friday',
+        // Reset workout schedule to empty values to force onboarding
+        const emptySchedule = {
+            benchPress: '',
+            squat: '',
+            deadlift: '',
+            overheadPress: '',
         };
-        setWorkoutSchedule(defaultSchedule);
+        setWorkoutSchedule(emptySchedule);
 
-        // Reset exercise progression to defaults
-        const defaultProgression = {
-            benchPress: 2.5,
-            squat: 5,
-            deadlift: 5,
-            overheadPress: 2.5,
+        // Reset exercise progression to empty values to force onboarding
+        const emptyProgression = {
+            benchPress: 0,
+            squat: 0,
+            deadlift: 0,
+            overheadPress: 0,
         };
-        setExerciseProgression(defaultProgression);
+        setExerciseProgression(emptyProgression);
 
-        // Reset 1RM to defaults
-        const defaultOneRepMax = {
-            benchPress: 100,
-            squat: 140,
-            deadlift: 180,
-            overheadPress: 70,
+        // Reset 1RM to empty values to force onboarding
+        const emptyOneRepMax = {
+            benchPress: 0,
+            squat: 0,
+            deadlift: 0,
+            overheadPress: 0,
         };
-        setOneRepMax(defaultOneRepMax);
+        setOneRepMax(emptyOneRepMax);
 
-        // Reset training max percentage to defaults
-        const defaultTrainingMax = {
-            percentage: 90,
+        // Reset training max percentage to empty values to force onboarding
+        const emptyTrainingMax = {
+            percentage: 0,
         };
-        setTrainingMaxPercentage(defaultTrainingMax);
+        setTrainingMaxPercentage(emptyTrainingMax);
 
         // Reset warm-up sets to defaults
         const defaultWarmup = {
@@ -288,18 +268,18 @@ export const SettingsScreen: React.FC = () => {
 
         // Update local state for progression inputs
         setProgressionInputs({
-            benchPress: defaultProgression.benchPress.toString(),
-            squat: defaultProgression.squat.toString(),
-            deadlift: defaultProgression.deadlift.toString(),
-            overheadPress: defaultProgression.overheadPress.toString(),
+            benchPress: '',
+            squat: '',
+            deadlift: '',
+            overheadPress: '',
         });
 
         // Update local state for 1RM inputs
         setOneRepMaxInputs({
-            benchPress: defaultOneRepMax.benchPress.toString(),
-            squat: defaultOneRepMax.squat.toString(),
-            deadlift: defaultOneRepMax.deadlift.toString(),
-            overheadPress: defaultOneRepMax.overheadPress.toString(),
+            benchPress: '',
+            squat: '',
+            deadlift: '',
+            overheadPress: '',
         });
 
         // Update local state for warm-up inputs
@@ -316,7 +296,7 @@ export const SettingsScreen: React.FC = () => {
 
         Alert.alert(
             'Settings Reset',
-            'All settings have been reset to their default values.',
+            'All settings have been reset. You will need to complete setup again.',
             [{ text: 'OK' }]
         );
     };
@@ -362,6 +342,21 @@ export const SettingsScreen: React.FC = () => {
                 setOneRepMax(emptyOneRepMax),
                 setTrainingMaxPercentage(emptyTrainingMax),
             ]);
+
+            // Update local state to reflect empty values
+            setProgressionInputs({
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            });
+
+            setOneRepMaxInputs({
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            });
 
             setResetDataModalVisible(false);
 
@@ -640,7 +635,7 @@ export const SettingsScreen: React.FC = () => {
                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                             }}
                         >
-                            This will reset all settings to their default values. This action cannot be undone.
+                            Reset all settings to empty values, requiring you to complete the setup process again. Your workout data will not be affected.
                         </Text>
                     </View>
 
@@ -675,7 +670,7 @@ export const SettingsScreen: React.FC = () => {
                                 lineHeight: 16,
                             }}
                         >
-                            This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will also be reset to defaults.
+                            This action will reset all your app settings to empty values, requiring you to complete the setup process again. Your workout data will not be affected.
                         </Text>
                     </View>
 
@@ -714,7 +709,7 @@ export const SettingsScreen: React.FC = () => {
                                     color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                 }}
                             >
-                                • Workout Schedule: Default days
+                                • Workout Schedule: Empty (requires setup)
                             </Text>
                             <Text
                                 style={{
@@ -722,7 +717,23 @@ export const SettingsScreen: React.FC = () => {
                                     color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                 }}
                             >
-                                • Exercise Progression: Default values
+                                • Exercise Progression: Empty (requires setup)
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • 1 Rep Max Values: Empty (requires setup)
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Training Max Percentage: Empty (requires setup)
                             </Text>
                         </View>
                     </View>
@@ -1234,6 +1245,7 @@ export const SettingsScreen: React.FC = () => {
                                 Set weight progression per cycle
                             </Text>
                         </View>
+
                         <View style={{ gap: 12 }}>
                             {Object.entries(exerciseNames).map(([key, name]) => (
                                 <View key={key} style={{ gap: 8 }}>
@@ -1259,19 +1271,15 @@ export const SettingsScreen: React.FC = () => {
                                             value={progressionInputs[key as keyof typeof progressionInputs]}
                                             onChangeText={(value) => handleProgressionChange(key as keyof typeof exerciseProgression, value)}
                                             onBlur={() => handleProgressionBlur(key as keyof typeof exerciseProgression)}
+                                            mode="outlined"
                                             keyboardType="numeric"
+                                            placeholder="2.5"
                                             style={{
                                                 flex: 1,
-                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                borderWidth: 1,
-                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                borderRadius: 8,
-                                                padding: 12,
-                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                            }}
+                                            contentStyle={{
                                                 fontSize: 16,
                                             }}
-                                            placeholder="2.5"
-                                            placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
                                         />
                                     </View>
                                 </View>
@@ -1325,19 +1333,15 @@ export const SettingsScreen: React.FC = () => {
                                                 value={oneRepMaxInputs[key as keyof typeof oneRepMaxInputs]}
                                                 onChangeText={(value) => handleOneRepMaxChange(key as keyof typeof oneRepMax, value)}
                                                 onBlur={() => handleOneRepMaxBlur(key as keyof typeof oneRepMax)}
+                                                mode="outlined"
                                                 keyboardType="numeric"
+                                                placeholder="100"
                                                 style={{
                                                     flex: 1,
-                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                    borderWidth: 1,
-                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                    borderRadius: 8,
-                                                    padding: 12,
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                }}
+                                                contentStyle={{
                                                     fontSize: 16,
                                                 }}
-                                                placeholder="100"
-                                                placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
                                             />
                                             <Text
                                                 style={{
@@ -1582,18 +1586,15 @@ export const SettingsScreen: React.FC = () => {
                                                         value={warmupInputs[`${key}Percentage` as keyof typeof warmupInputs]}
                                                         onChangeText={(value) => handleWarmupChange(key as 'set1' | 'set2' | 'set3', 'percentage', value)}
                                                         onBlur={() => handleWarmupBlur(key as 'set1' | 'set2' | 'set3', 'percentage')}
+                                                        mode="outlined"
                                                         keyboardType="numeric"
+                                                        placeholder="40"
                                                         style={{
-                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                            borderWidth: 1,
-                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                            borderRadius: 8,
-                                                            padding: 12,
-                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            backgroundColor: 'transparent',
+                                                        }}
+                                                        contentStyle={{
                                                             fontSize: 16,
                                                         }}
-                                                        placeholder="40"
-                                                        placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
                                                     />
                                                 </View>
                                                 <Text
@@ -1619,18 +1620,15 @@ export const SettingsScreen: React.FC = () => {
                                                         value={warmupInputs[`${key}Reps` as keyof typeof warmupInputs]}
                                                         onChangeText={(value) => handleWarmupChange(key as 'set1' | 'set2' | 'set3', 'reps', value)}
                                                         onBlur={() => handleWarmupBlur(key as 'set1' | 'set2' | 'set3', 'reps')}
+                                                        mode="outlined"
                                                         keyboardType="numeric"
+                                                        placeholder="5"
                                                         style={{
-                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                            borderWidth: 1,
-                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                            borderRadius: 8,
-                                                            padding: 12,
-                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            backgroundColor: 'transparent',
+                                                        }}
+                                                        contentStyle={{
                                                             fontSize: 16,
                                                         }}
-                                                        placeholder="5"
-                                                        placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
                                                     />
                                                 </View>
                                             </View>
@@ -1690,7 +1688,7 @@ export const SettingsScreen: React.FC = () => {
                                     marginBottom: 12,
                                 }}
                             >
-                                Reset theme, units, workout schedule, and exercise progression to default values. Your workout data will not be affected.
+                                Reset all settings to empty values, requiring you to complete the setup process again. Your workout data will not be affected.
                             </Text>
                             <Button
                                 onPress={handleResetSettings}

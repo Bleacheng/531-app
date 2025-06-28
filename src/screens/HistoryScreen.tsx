@@ -24,69 +24,33 @@ export const HistoryScreen: React.FC = () => {
     const stats = [
         {
             title: 'Total Workouts',
-            value: '24',
+            value: '0',
             icon: Calendar,
             color: COLORS.primary
         },
         {
             title: 'Current Cycle',
-            value: 'Cycle 1',
+            value: 'Not Started',
             icon: TrendingUp,
             color: COLORS.success
         },
         {
             title: 'Best Deadlift',
-            value: formatWeight(200),
+            value: 'No Data',
             icon: Target,
             color: COLORS.warning
         },
         {
             title: 'Training Max',
-            value: formatWeight(180),
+            value: 'No Data',
             icon: Dumbbell,
             color: COLORS.error
         },
     ];
 
-    const recentProgress = [
-        { exercise: 'Bench Press', current: 100, previous: 95, change: 5, status: 'success' as const },
-        { exercise: 'Deadlift', current: 180, previous: 175, change: 5, status: 'success' as const },
-        { exercise: 'Squat', current: 140, previous: 140, change: 0, status: 'warning' as const },
-        { exercise: 'Overhead Press', current: 70, previous: 72, change: -2, status: 'error' as const },
-    ];
+    const recentProgress: any[] = [];
 
-    const workoutHistory = [
-        {
-            date: 'Today',
-            workout: 'Week 3 - Bench Press',
-            exercises: ['Bench Press 5/3/1+', 'Assistance Work'],
-            status: 'completed' as const
-        },
-        {
-            date: 'Yesterday',
-            workout: 'Week 3 - Squat',
-            exercises: ['Squat 5/3/1+', 'Assistance Work'],
-            status: 'completed' as const
-        },
-        {
-            date: '2 days ago',
-            workout: 'Week 3 - Deadlift',
-            exercises: ['Deadlift 5/3/1+', 'Assistance Work'],
-            status: 'completed' as const
-        },
-        {
-            date: '3 days ago',
-            workout: 'Week 3 - Overhead Press',
-            exercises: ['Overhead Press 5/3/1+', 'Assistance Work'],
-            status: 'completed' as const
-        },
-        {
-            date: '1 week ago',
-            workout: 'Week 2 - Bench Press',
-            exercises: ['Bench Press 3/3/3+', 'Assistance Work'],
-            status: 'completed' as const
-        },
-    ];
+    const workoutHistory: any[] = [];
 
     const getStatusColor = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -193,33 +157,67 @@ export const HistoryScreen: React.FC = () => {
                     </Text>
                 </View>
                 <View style={{ gap: 12 }}>
-                    {recentProgress.map((item, index) => (
-                        <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <View style={{ flex: 1 }}>
-                                <Text
-                                    style={{
-                                        fontSize: 16,
-                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                        fontWeight: '500'
-                                    }}
-                                >
-                                    {item.exercise}
-                                </Text>
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                    }}
-                                >
-                                    {formatWeight(item.current)} (was {formatWeight(item.previous)})
-                                </Text>
+                    {recentProgress.length > 0 ? (
+                        recentProgress.map((item, index) => (
+                            <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <View style={{ flex: 1 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 16,
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        {item.exercise}
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            fontSize: 14,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                        }}
+                                    >
+                                        {formatWeight(item.current)} (was {formatWeight(item.previous)})
+                                    </Text>
+                                </View>
+                                <Badge
+                                    label={item.change > 0 ? `+${item.change} kg` : item.change < 0 ? `${item.change} kg` : '0 kg'}
+                                    variant={item.status}
+                                />
                             </View>
-                            <Badge
-                                label={item.change > 0 ? `+${item.change} kg` : item.change < 0 ? `${item.change} kg` : '0 kg'}
-                                variant={item.status}
-                            />
+                        ))
+                    ) : (
+                        <View style={{
+                            padding: 20,
+                            alignItems: 'center',
+                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                        }}>
+                            <Target size={24} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    fontWeight: '500',
+                                    marginTop: 8,
+                                    textAlign: 'center'
+                                }}
+                            >
+                                No Progress Data
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    textAlign: 'center',
+                                    marginTop: 4
+                                }}
+                            >
+                                Complete your first workout to see progress here
+                            </Text>
                         </View>
-                    ))}
+                    )}
                 </View>
             </Card>
 
@@ -241,54 +239,88 @@ export const HistoryScreen: React.FC = () => {
                     </Text>
                 </View>
                 <View style={{ gap: 12 }}>
-                    {workoutHistory.map((workout, index) => (
-                        <View
-                            key={index}
-                            style={{
-                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                padding: 12,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                            }}
-                        >
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    {workoutHistory.length > 0 ? (
+                        workoutHistory.map((workout, index) => (
+                            <View
+                                key={index}
+                                style={{
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    padding: 12,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                }}
+                            >
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 16,
+                                            fontWeight: 'bold',
+                                            color: isDark ? COLORS.textDark : COLORS.text
+                                        }}
+                                    >
+                                        {workout.workout}
+                                    </Text>
+                                    <Badge
+                                        label={workout.date}
+                                        variant="complementary"
+                                    />
+                                </View>
                                 <Text
                                     style={{
-                                        fontSize: 16,
-                                        fontWeight: 'bold',
-                                        color: isDark ? COLORS.textDark : COLORS.text
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                        marginBottom: 4
                                     }}
                                 >
-                                    {workout.workout}
+                                    {workout.exercises.join(' • ')}
                                 </Text>
-                                <Badge
-                                    label={workout.date}
-                                    variant="complementary"
-                                />
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            color: getStatusColor(workout.status),
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        ✓ Completed
+                                    </Text>
+                                </View>
                             </View>
+                        ))
+                    ) : (
+                        <View style={{
+                            padding: 20,
+                            alignItems: 'center',
+                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                        }}>
+                            <History size={24} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    fontWeight: '500',
+                                    marginTop: 8,
+                                    textAlign: 'center'
+                                }}
+                            >
+                                No Workout History
+                            </Text>
                             <Text
                                 style={{
                                     fontSize: 14,
                                     color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    marginBottom: 4
+                                    textAlign: 'center',
+                                    marginTop: 4
                                 }}
                             >
-                                {workout.exercises.join(' • ')}
+                                Complete your first workout to see history here
                             </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Text
-                                    style={{
-                                        fontSize: 12,
-                                        color: getStatusColor(workout.status),
-                                        fontWeight: '500'
-                                    }}
-                                >
-                                    ✓ Completed
-                                </Text>
-                            </View>
                         </View>
-                    ))}
+                    )}
                 </View>
             </Card>
         </ScrollView>
