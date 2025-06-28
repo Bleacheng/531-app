@@ -1,28 +1,33 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, TextInput } from 'react-native';
-import { Calendar, CheckCircle, Circle, TrendingUp, X, ArrowRight, ArrowLeft, Settings, UserPlus } from 'lucide-react-native';
+import { Calendar, CheckCircle, Circle, TrendingUp, X, ArrowRight, ArrowLeft, Settings, UserPlus, ChevronDown, BarChart3 } from 'lucide-react-native';
 import Modal from 'react-native-modal';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
+import { OneRMGraph } from '../components/OneRMGraph';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 
-export const HomeScreen: React.FC = () => {
+export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | 'settings') => void }> = ({ onNavigate }) => {
     const { theme } = useTheme();
     const {
         formatWeight,
         workoutSchedule,
         exerciseProgression,
         oneRepMax,
+        unit,
         saveScrollPosition,
         getScrollPosition,
         isOnboardingNeeded,
         completeOnboarding,
         updateWorkoutDay,
         updateExerciseProgression,
-        updateOneRepMax
+        updateOneRepMax,
+        getMissingOnboardingItems,
+        getOnboardingProgress,
+        updateTrainingMaxPercentage
     } = useSettings();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
@@ -48,8 +53,13 @@ export const HomeScreen: React.FC = () => {
             squat: '',
             deadlift: '',
             overheadPress: '',
-        }
+        },
+        trainingMaxPercentage: '90'
     });
+
+    // Day selector modal state (like in settings)
+    const [daySelectorModalVisible, setDaySelectorModalVisible] = useState(false);
+    const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
 
     // Restore scroll position when component mounts
     useEffect(() => {
@@ -64,9 +74,54 @@ export const HomeScreen: React.FC = () => {
         // TODO: Navigate to workout screen
     };
 
+    // Day selector functions (like in settings)
+    const dayOptions = [
+        'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    ];
+
+    const exerciseNames = {
+        benchPress: 'Bench Press',
+        squat: 'Squat',
+        deadlift: 'Deadlift',
+        overheadPress: 'Overhead Press'
+    };
+
+    const getAvailableDays = (currentExercise: keyof typeof workoutSchedule) => {
+        const currentDay = onboardingData.workoutSchedule[currentExercise];
+        return dayOptions.map(day => {
+            // Check if any other exercise is using this day
+            const conflictingExercise = Object.entries(onboardingData.workoutSchedule).find(([key, scheduledDay]) =>
+                key !== currentExercise && scheduledDay === day
+            );
+
+            return {
+                day,
+                isCurrent: day === currentDay,
+                hasConflict: !!conflictingExercise,
+                conflictingExercise: conflictingExercise ? exerciseNames[conflictingExercise[0] as keyof typeof exerciseNames] : null
+            };
+        });
+    };
+
+    const openDaySelector = (exercise: keyof typeof workoutSchedule) => {
+        setSelectedExercise(exercise);
+        setDaySelectorModalVisible(true);
+    };
+
+    const handleDaySelect = (exercise: keyof typeof workoutSchedule, day: string) => {
+        updateOnboardingData('workoutSchedule', exercise, day);
+        setDaySelectorModalVisible(false);
+        setSelectedExercise(null);
+    };
+
     // Onboarding functions
     const handleOnboardingNext = () => {
-        if (currentStep < 2) {
+        // Validate current step before proceeding
+        if (!isCurrentStepValid()) {
+            return;
+        }
+
+        if (currentStep < 3) {
             setCurrentStep(currentStep + 1);
         } else {
             handleCompleteOnboarding();
@@ -76,6 +131,73 @@ export const HomeScreen: React.FC = () => {
     const handleOnboardingBack = () => {
         if (currentStep > 0) {
             setCurrentStep(currentStep - 1);
+        }
+    };
+
+    // Validation functions for each step
+    const isCurrentStepValid = () => {
+        switch (currentStep) {
+            case 0: // Workout Schedule
+                return Object.values(onboardingData.workoutSchedule).every(day => day !== '') &&
+                    Object.values(onboardingData.workoutSchedule).length === new Set(Object.values(onboardingData.workoutSchedule)).size;
+            case 1: // Exercise Progression
+                return Object.values(onboardingData.exerciseProgression).every(progression =>
+                    progression !== '' && !isNaN(parseFloat(progression)) && parseFloat(progression) > 0
+                );
+            case 2: // 1 Rep Max
+                return Object.values(onboardingData.oneRepMax).every(weight =>
+                    weight !== '' && !isNaN(parseFloat(weight)) && parseFloat(weight) > 0
+                );
+            case 3: // Training Max Percentage
+                return onboardingData.trainingMaxPercentage !== '' &&
+                    !isNaN(parseFloat(onboardingData.trainingMaxPercentage)) &&
+                    parseFloat(onboardingData.trainingMaxPercentage) >= 80 &&
+                    parseFloat(onboardingData.trainingMaxPercentage) <= 100;
+            default:
+                return false;
+        }
+    };
+
+    const getStepValidationError = () => {
+        switch (currentStep) {
+            case 0: // Workout Schedule
+                if (!Object.values(onboardingData.workoutSchedule).every(day => day !== '')) {
+                    return 'Please select a day for all exercises';
+                }
+                if (Object.values(onboardingData.workoutSchedule).length !== new Set(Object.values(onboardingData.workoutSchedule)).size) {
+                    return 'Each exercise must be on a different day';
+                }
+                return null;
+            case 1: // Exercise Progression
+                const invalidProgression = Object.entries(onboardingData.exerciseProgression).find(([exercise, progression]) =>
+                    progression === '' || isNaN(parseFloat(progression)) || parseFloat(progression) <= 0
+                );
+                if (invalidProgression) {
+                    return `Please enter a valid progression for ${invalidProgression[0]}`;
+                }
+                return null;
+            case 2: // 1 Rep Max
+                const invalidWeight = Object.entries(onboardingData.oneRepMax).find(([exercise, weight]) =>
+                    weight === '' || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0
+                );
+                if (invalidWeight) {
+                    return `Please enter a valid 1RM for ${invalidWeight[0]}`;
+                }
+                return null;
+            case 3: // Training Max Percentage
+                if (onboardingData.trainingMaxPercentage === '') {
+                    return 'Please enter a training max percentage';
+                }
+                if (isNaN(parseFloat(onboardingData.trainingMaxPercentage))) {
+                    return 'Please enter a valid number';
+                }
+                const percentage = parseFloat(onboardingData.trainingMaxPercentage);
+                if (percentage < 80 || percentage > 100) {
+                    return 'Training max must be between 80% and 100%';
+                }
+                return null;
+            default:
+                return null;
         }
     };
 
@@ -99,6 +221,11 @@ export const HomeScreen: React.FC = () => {
             }
         });
 
+        // Save training max percentage
+        if (onboardingData.trainingMaxPercentage) {
+            updateTrainingMaxPercentage(parseFloat(onboardingData.trainingMaxPercentage));
+        }
+
         // Complete onboarding
         await completeOnboarding();
         setOnboardingVisible(false);
@@ -106,13 +233,20 @@ export const HomeScreen: React.FC = () => {
     };
 
     const updateOnboardingData = (section: keyof typeof onboardingData, field: string, value: string) => {
-        setOnboardingData(prev => ({
-            ...prev,
-            [section]: {
-                ...prev[section],
-                [field]: value
-            }
-        }));
+        if (section === 'trainingMaxPercentage') {
+            setOnboardingData(prev => ({
+                ...prev,
+                trainingMaxPercentage: value
+            }));
+        } else {
+            setOnboardingData(prev => ({
+                ...prev,
+                [section]: {
+                    ...prev[section],
+                    [field]: value
+                }
+            }));
+        }
     };
 
     const getStepTitle = (step: number) => {
@@ -120,6 +254,7 @@ export const HomeScreen: React.FC = () => {
             case 0: return 'Workout Schedule';
             case 1: return 'Exercise Progression';
             case 2: return '1 Rep Max (1RM)';
+            case 3: return 'Training Max Percentage';
             default: return '';
         }
     };
@@ -129,9 +264,14 @@ export const HomeScreen: React.FC = () => {
             case 0: return 'Choose which day each exercise is performed';
             case 1: return 'Set weight progression per cycle for each exercise';
             case 2: return 'Enter your current 1 rep max for each exercise';
+            case 3: return 'Enter your training max percentage';
             default: return '';
         }
     };
+
+    // Get missing items for the onboarding card
+    const missingItems = getMissingOnboardingItems();
+    const onboardingProgress = getOnboardingProgress();
 
     // Helper function to calculate workout weight based on progression
     const calculateWorkoutWeight = (exercise: string, baseWeight: number, cycle: number) => {
@@ -178,41 +318,18 @@ export const HomeScreen: React.FC = () => {
     // Memoize today's date to prevent recalculation on every render
     const today = useMemo(() => new Date(), []);
 
-    // This week's workouts (Week 3 - 5/3/1+)
-    const thisWeeksWorkouts = useMemo(() => [
-        {
-            lift: 'Bench Press',
-            topSet: '5/3/1+',
-            weight: '85kg',
-            day: workoutSchedule.benchPress,
-            date: new Date(weekStart.getTime() + getDayOffset(workoutSchedule.benchPress) * 24 * 60 * 60 * 1000),
-            completed: true
-        },
-        {
-            lift: 'Squat',
-            topSet: '5/3/1+',
-            weight: '120kg',
-            day: workoutSchedule.squat,
-            date: new Date(weekStart.getTime() + getDayOffset(workoutSchedule.squat) * 24 * 60 * 60 * 1000),
-            completed: true
-        },
-        {
-            lift: 'Deadlift',
-            topSet: '5/3/1+',
-            weight: '160kg',
-            day: workoutSchedule.deadlift,
-            date: new Date(weekStart.getTime() + getDayOffset(workoutSchedule.deadlift) * 24 * 60 * 60 * 1000),
-            completed: false
-        },
-        {
-            lift: 'Overhead Press',
-            topSet: '5/3/1+',
-            weight: '60kg',
-            day: workoutSchedule.overheadPress,
-            date: new Date(weekStart.getTime() + getDayOffset(workoutSchedule.overheadPress) * 24 * 60 * 60 * 1000),
-            completed: false
-        },
-    ], [workoutSchedule, weekStart]);
+    // This week's workouts - Empty until real workout data is implemented
+    const thisWeeksWorkouts = useMemo(() => {
+        // Return empty array until real workout tracking is implemented
+        return [] as Array<{
+            lift: string;
+            topSet: string;
+            weight: string;
+            day: string;
+            date: Date;
+            completed: boolean;
+        }>;
+    }, []);
 
     // Memoize today's workout to prevent recalculation
     const todaysWorkout = useMemo(() => {
@@ -232,57 +349,23 @@ export const HomeScreen: React.FC = () => {
         [thisWeeksWorkouts]
     );
 
-    // 5/3/1 4-week cycle overview with completed lifts and pass/fail status
-    const cycleOverview = [
-        {
-            week: 1,
-            name: 'Week 1',
-            description: '5/5/5+',
-            status: 'completed' as const,
-            lifts: [
-                { lift: 'Bench Press', topSet: '5/5/5+', weight: '80kg', reps: 8, passed: true },
-                { lift: 'Squat', topSet: '5/5/5+', weight: '115kg', reps: 7, passed: true },
-                { lift: 'Deadlift', topSet: '5/5/5+', weight: '155kg', reps: 6, passed: true },
-                { lift: 'Overhead Press', topSet: '5/5/5+', weight: '55kg', reps: 9, passed: true },
-            ]
-        },
-        {
-            week: 2,
-            name: 'Week 2',
-            description: '3/3/3+',
-            status: 'completed' as const,
-            lifts: [
-                { lift: 'Bench Press', topSet: '3/3/3+', weight: '82kg', reps: 5, passed: true },
-                { lift: 'Squat', topSet: '3/3/3+', weight: '117kg', reps: 4, passed: true },
-                { lift: 'Deadlift', topSet: '3/3/3+', weight: '157kg', reps: 3, passed: true },
-                { lift: 'Overhead Press', topSet: '3/3/3+', weight: '57kg', reps: 6, passed: true },
-            ]
-        },
-        {
-            week: 3,
-            name: 'Week 3',
-            description: '5/3/1+',
-            status: 'current' as const,
-            lifts: [
-                { lift: 'Bench Press', topSet: '5/3/1+', weight: '85kg', reps: 3, passed: true },
-                { lift: 'Squat', topSet: '5/3/1+', weight: '120kg', reps: 2, passed: true },
-                { lift: 'Deadlift', topSet: '5/3/1+', weight: '160kg', reps: 1, passed: false },
-                { lift: 'Overhead Press', topSet: '5/3/1+', weight: '60kg', reps: 4, passed: null },
-            ]
-        },
-        {
-            week: 4,
-            name: 'Week 4',
-            description: 'Deload',
-            status: 'upcoming' as const,
-            lifts: [
-                { lift: 'Bench Press', topSet: '5x5', weight: '65kg', reps: null, passed: null },
-                { lift: 'Squat', topSet: '5x5', weight: '95kg', reps: null, passed: null },
-                { lift: 'Deadlift', topSet: '5x5', weight: '125kg', reps: null, passed: null },
-                { lift: 'Overhead Press', topSet: '5x5', weight: '45kg', reps: null, passed: null },
-            ]
-        },
-    ];
+    // 5/3/1 4-week cycle overview - Empty until real cycle data is implemented
+    const cycleOverview = useMemo(() => {
+        // Return empty array until real cycle tracking is implemented
+        return [] as Array<{
+            week: number;
+            name: string;
+            description: string;
+            status: 'completed' | 'current' | 'upcoming';
+            lifts: Array<{
+                lift: string;
+                topSet: string;
+                weight: string;
+                reps: number | null;
+                passed: boolean | null;
+            }>;
+        }>;
+    }, []);
 
     const getStatusIcon = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -328,6 +411,18 @@ export const HomeScreen: React.FC = () => {
         });
     };
 
+    // 1RM tracking data - Empty until real 1RM tracking is implemented
+    const oneRMData = useMemo(() => {
+        // Return empty array until real 1RM tracking is implemented
+        return [] as Array<{
+            date: string;
+            benchPress: number;
+            squat: number;
+            deadlift: number;
+            overheadPress: number;
+        }>;
+    }, []);
+
     return (
         <>
             <ScrollView
@@ -361,7 +456,7 @@ export const HomeScreen: React.FC = () => {
                                     marginBottom: 12,
                                 }}
                             >
-                                Complete Your Setup
+                                Complete Your Setup ({onboardingProgress}%)
                             </Text>
                             <Text
                                 style={{
@@ -372,15 +467,93 @@ export const HomeScreen: React.FC = () => {
                                     lineHeight: 20,
                                 }}
                             >
-                                To start your 5/3/1 journey, we need to set up your workout schedule, exercise progression, and 1 rep max values.
+                                To start your 5/3/1 journey, we need to set up your workout schedule, exercise progression, 1 rep max values, and training max percentage.
                             </Text>
-                            <Button
-                                onPress={() => setOnboardingVisible(true)}
-                                variant="primary"
-                                fullWidth
-                            >
-                                Start Setup
-                            </Button>
+
+                            {/* Progress indicator */}
+                            <View style={{ width: '100%', marginBottom: 20 }}>
+                                <View style={{
+                                    width: '100%',
+                                    height: 8,
+                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    borderRadius: 4,
+                                    overflow: 'hidden'
+                                }}>
+                                    <View style={{
+                                        width: `${onboardingProgress}%`,
+                                        height: '100%',
+                                        backgroundColor: isDark ? COLORS.primary : COLORS.primaryDark,
+                                        borderRadius: 4
+                                    }} />
+                                </View>
+                            </View>
+
+                            {/* Missing items */}
+                            <View style={{ width: '100%', marginBottom: 24 }}>
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    Still needed:
+                                </Text>
+                                <View style={{ gap: 4 }}>
+                                    {missingItems.workoutSchedule && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                Workout Schedule
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {missingItems.exerciseProgression && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                Exercise Progression
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {missingItems.oneRepMax && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                1 Rep Max Values
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {missingItems.trainingMaxPercentage && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                Training Max Percentage
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+                                <Button
+                                    onPress={() => setOnboardingVisible(true)}
+                                    variant="primary"
+                                    style={{ flex: 1 }}
+                                >
+                                    Quick Setup
+                                </Button>
+                                <Button
+                                    onPress={() => {
+                                        onNavigate?.('settings');
+                                    }}
+                                    variant="outline"
+                                    style={{ flex: 1 }}
+                                >
+                                    Go to Settings
+                                </Button>
+                            </View>
                         </View>
                     </Card>
                 )}
@@ -403,6 +576,34 @@ export const HomeScreen: React.FC = () => {
                                 Week 3 - Cycle 1
                             </Text>
                         </View>
+
+                        {/* Empty State */}
+                        {thisWeeksWorkouts.length === 0 && (
+                            <View style={{ alignItems: 'center', padding: 20 }}>
+                                <Calendar size={48} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} style={{ marginBottom: 16 }} />
+                                <Text
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        textAlign: 'center',
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    No Workouts Scheduled
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                        textAlign: 'center',
+                                        lineHeight: 20,
+                                    }}
+                                >
+                                    Your workout plan will appear here once you start tracking your 5/3/1 program.
+                                </Text>
+                            </View>
+                        )}
 
                         {/* Today's Workout */}
                         {todaysWorkout && (
@@ -667,6 +868,35 @@ export const HomeScreen: React.FC = () => {
                                 Jim Wendler's 5/3/1 Program
                             </Text>
                         </View>
+
+                        {/* Empty State */}
+                        {cycleOverview.length === 0 && (
+                            <View style={{ alignItems: 'center', padding: 20 }}>
+                                <TrendingUp size={48} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} style={{ marginBottom: 16 }} />
+                                <Text
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        textAlign: 'center',
+                                        marginBottom: 8,
+                                    }}
+                                >
+                                    No Cycle Data Available
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                        textAlign: 'center',
+                                        lineHeight: 20,
+                                    }}
+                                >
+                                    Your 4-week cycle progress will appear here once you start tracking your workouts.
+                                </Text>
+                            </View>
+                        )}
+
                         <View style={{ gap: 16 }}>
                             {cycleOverview.map((week, index) => (
                                 <View key={index} style={{ gap: 8 }}>
@@ -732,6 +962,42 @@ export const HomeScreen: React.FC = () => {
                         </View>
                     </Card>
                 )}
+
+                {/* 1RM Progress Tracking - Only show when onboarding is complete */}
+                {!isOnboardingNeeded() && (
+                    <Card
+                        title="1RM Progress Tracking"
+                        borderColor={isDark ? COLORS.warningLight : COLORS.warning}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                            <BarChart3 size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14
+                                }}
+                            >
+                                Track your 1RM progress across cycles
+                            </Text>
+                        </View>
+
+                        <OneRMGraph data={oneRMData} unit={unit} />
+
+                        <View style={{ marginTop: 16, padding: 12, backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary, borderRadius: 8 }}>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    lineHeight: 16,
+                                }}
+                            >
+                                💡 Tip: Your 1RM is calculated using the Epley formula: 1RM = weight × (1 + reps/30).
+                                Track your progress by recording your max reps on the final set of each week.
+                            </Text>
+                        </View>
+                    </Card>
+                )}
             </ScrollView>
 
             {/* Onboarding Modal */}
@@ -791,7 +1057,7 @@ export const HomeScreen: React.FC = () => {
 
                         {/* Progress indicator */}
                         <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 16 }}>
-                            {[0, 1, 2].map((step) => (
+                            {[0, 1, 2, 3].map((step) => (
                                 <View
                                     key={step}
                                     style={{
@@ -827,40 +1093,48 @@ export const HomeScreen: React.FC = () => {
                                     >
                                         {name}
                                     </Text>
-                                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                                            <TouchableOpacity
-                                                key={day}
-                                                onPress={() => updateOnboardingData('workoutSchedule', key, day)}
+                                    <TouchableOpacity
+                                        onPress={() => openDaySelector(key as keyof typeof workoutSchedule)}
+                                        style={{
+                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                            borderWidth: 1,
+                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                            borderRadius: 8,
+                                            padding: 12,
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                        }}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text
                                                 style={{
-                                                    flex: 1,
-                                                    backgroundColor: onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule] === day
-                                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                        : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                                    borderWidth: 1,
-                                                    borderColor: onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule] === day
-                                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                        : (isDark ? COLORS.borderDark : COLORS.border),
-                                                    borderRadius: 8,
-                                                    padding: 12,
-                                                    alignItems: 'center',
+                                                    fontSize: 16,
+                                                    fontWeight: '500',
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
                                                 }}
-                                                activeOpacity={0.8}
                                             >
-                                                <Text
-                                                    style={{
-                                                        fontSize: 12,
-                                                        fontWeight: '600',
-                                                        color: onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule] === day
-                                                            ? 'white'
-                                                            : (isDark ? COLORS.textDark : COLORS.text),
-                                                    }}
-                                                >
-                                                    {day.slice(0, 3)}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
+                                                {onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule] || 'Select day'}
+                                            </Text>
+                                            {/* Show conflict warning if applicable */}
+                                            {onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule] &&
+                                                getAvailableDays(key as keyof typeof workoutSchedule).find(d => d.day === onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule])?.hasConflict && (
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: isDark ? COLORS.warning : COLORS.warningDark,
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        Conflicts with {getAvailableDays(key as keyof typeof workoutSchedule).find(d => d.day === onboardingData.workoutSchedule[key as keyof typeof onboardingData.workoutSchedule])?.conflictingExercise}
+                                                    </Text>
+                                                )}
+                                        </View>
+                                        <ChevronDown
+                                            size={16}
+                                            color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary}
+                                        />
+                                    </TouchableOpacity>
                                 </View>
                             ))}
                         </View>
@@ -967,6 +1241,78 @@ export const HomeScreen: React.FC = () => {
                         </View>
                     )}
 
+                    {currentStep === 3 && (
+                        <View style={{ gap: 12 }}>
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                Training Max Percentage
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Percentage of 1RM used as training max for all exercises (typically 85-90%)
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <TextInput
+                                    value={onboardingData.trainingMaxPercentage}
+                                    onChangeText={(value) => updateOnboardingData('trainingMaxPercentage', '', value)}
+                                    keyboardType="numeric"
+                                    style={{
+                                        flex: 1,
+                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                        borderWidth: 1,
+                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                        borderRadius: 8,
+                                        padding: 12,
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        fontSize: 16,
+                                    }}
+                                    placeholder="90"
+                                    placeholderTextColor={isDark ? COLORS.textTertiaryDark : COLORS.textTertiary}
+                                />
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                        minWidth: 30,
+                                    }}
+                                >
+                                    %
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
+                    {/* Validation Error */}
+                    {getStepValidationError() && (
+                        <View style={{
+                            backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                            padding: 12,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                            marginTop: 16,
+                        }}>
+                            <Text style={{
+                                fontSize: 14,
+                                color: isDark ? COLORS.error : COLORS.errorDark,
+                                textAlign: 'center',
+                            }}>
+                                {getStepValidationError()}
+                            </Text>
+                        </View>
+                    )}
+
                     {/* Navigation Buttons */}
                     <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
                         {currentStep > 0 && (
@@ -993,23 +1339,164 @@ export const HomeScreen: React.FC = () => {
                         )}
                         <TouchableOpacity
                             onPress={handleOnboardingNext}
+                            disabled={!isCurrentStepValid()}
                             style={{
                                 flex: 1,
-                                backgroundColor: isDark ? COLORS.primary : COLORS.primaryDark,
+                                backgroundColor: isCurrentStepValid()
+                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
                                 borderRadius: 8,
                                 padding: 16,
                                 alignItems: 'center',
                                 flexDirection: 'row',
                                 justifyContent: 'center',
                             }}
-                            activeOpacity={0.8}
+                            activeOpacity={isCurrentStepValid() ? 0.8 : 1}
                         >
-                            <Text style={{ color: 'white', fontSize: 16, fontWeight: '600', marginRight: 8 }}>
-                                {currentStep === 2 ? 'Complete' : 'Next'}
+                            <Text style={{
+                                color: isCurrentStepValid() ? 'white' : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
+                                fontSize: 16,
+                                fontWeight: '600',
+                                marginRight: 8
+                            }}>
+                                {currentStep === 3 ? 'Complete' : 'Next'}
                             </Text>
-                            {currentStep < 2 && <ArrowRight size={16} color="white" />}
+                            {currentStep < 3 && <ArrowRight size={16} color={isCurrentStepValid() ? "white" : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary)} />}
                         </TouchableOpacity>
                     </View>
+                </View>
+            </Modal>
+
+            {/* Day Selector Modal */}
+            <Modal
+                isVisible={daySelectorModalVisible}
+                onBackdropPress={() => setDaySelectorModalVisible(false)}
+                style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 20,
+                }}
+                backdropOpacity={0.5}
+                useNativeDriver={true}
+                hideModalContentWhileAnimating={true}
+                statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
+            >
+                <View
+                    style={{
+                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                        borderRadius: 12,
+                        padding: 20,
+                        width: '100%',
+                        maxWidth: 400,
+                        shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        elevation: 8,
+                    }}
+                >
+                    {/* Header */}
+                    <View style={{ marginBottom: 20 }}>
+                        <Text
+                            style={{
+                                fontSize: 20,
+                                fontWeight: 'bold',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                textAlign: 'center',
+                            }}
+                        >
+                            Select Day
+                        </Text>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                textAlign: 'center',
+                                marginTop: 8,
+                            }}
+                        >
+                            Choose which day to perform {selectedExercise ? exerciseNames[selectedExercise] : 'this exercise'}
+                        </Text>
+                    </View>
+
+                    {/* Day Options */}
+                    <View style={{ gap: 8 }}>
+                        {selectedExercise && getAvailableDays(selectedExercise).map(({ day, isCurrent, hasConflict, conflictingExercise }) => (
+                            <TouchableOpacity
+                                key={day}
+                                onPress={() => handleDaySelect(selectedExercise, day)}
+                                style={{
+                                    backgroundColor: isCurrent
+                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                        : hasConflict
+                                            ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
+                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                    borderWidth: 1,
+                                    borderColor: isCurrent
+                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                        : hasConflict
+                                            ? (isDark ? COLORS.error : COLORS.errorDark)
+                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                    borderRadius: 8,
+                                    padding: 16,
+                                    alignItems: 'center',
+                                }}
+                                activeOpacity={0.8}
+                                disabled={hasConflict}
+                            >
+                                <Text
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: '600',
+                                        color: isCurrent
+                                            ? 'white'
+                                            : hasConflict
+                                                ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                    }}
+                                >
+                                    {day}
+                                </Text>
+                                {isCurrent && (
+                                    <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                )}
+                                {hasConflict && (
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.error : COLORS.errorDark,
+                                            marginTop: 4,
+                                        }}
+                                    >
+                                        Conflicts with {conflictingExercise}
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {/* Cancel Button */}
+                    <TouchableOpacity
+                        onPress={() => setDaySelectorModalVisible(false)}
+                        style={{
+                            backgroundColor: 'transparent',
+                            padding: 16,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            marginTop: 16,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: '600' }}>
+                            Cancel
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </Modal>
         </>

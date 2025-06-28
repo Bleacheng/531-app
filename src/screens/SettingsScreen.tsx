@@ -30,7 +30,12 @@ export const SettingsScreen: React.FC = () => {
         updateWarmupSet,
         toggleWarmupEnabled,
         saveScrollPosition,
-        getScrollPosition
+        getScrollPosition,
+        setWorkoutSchedule,
+        setExerciseProgression,
+        setOneRepMax,
+        setTrainingMaxPercentage,
+        setWarmupSets
     } = useSettings();
     const isDark = theme === 'dark';
 
@@ -44,6 +49,36 @@ export const SettingsScreen: React.FC = () => {
             scrollViewRef.current?.scrollTo({ y: savedPosition, animated: false });
         }
     }, []);
+
+    // Update local state when context values change
+    useEffect(() => {
+        setProgressionInputs({
+            benchPress: exerciseProgression.benchPress.toString(),
+            squat: exerciseProgression.squat.toString(),
+            deadlift: exerciseProgression.deadlift.toString(),
+            overheadPress: exerciseProgression.overheadPress.toString(),
+        });
+    }, [exerciseProgression]);
+
+    useEffect(() => {
+        setOneRepMaxInputs({
+            benchPress: oneRepMax.benchPress.toString(),
+            squat: oneRepMax.squat.toString(),
+            deadlift: oneRepMax.deadlift.toString(),
+            overheadPress: oneRepMax.overheadPress.toString(),
+        });
+    }, [oneRepMax]);
+
+    useEffect(() => {
+        setWarmupInputs({
+            set1Percentage: warmupSets.set1.percentage.toString(),
+            set1Reps: warmupSets.set1.reps.toString(),
+            set2Percentage: warmupSets.set2.percentage.toString(),
+            set2Reps: warmupSets.set2.reps.toString(),
+            set3Percentage: warmupSets.set3.percentage.toString(),
+            set3Reps: warmupSets.set3.reps.toString(),
+        });
+    }, [warmupSets]);
 
     // Local state for text inputs
     const [progressionInputs, setProgressionInputs] = useState({
@@ -216,10 +251,7 @@ export const SettingsScreen: React.FC = () => {
             deadlift: 'Thursday',
             overheadPress: 'Friday',
         };
-        // Note: We need to use the bulk update method since we're updating multiple exercises
-        Object.entries(defaultSchedule).forEach(([exercise, day]) => {
-            updateWorkoutDay(exercise as keyof typeof workoutSchedule, day);
-        });
+        setWorkoutSchedule(defaultSchedule);
 
         // Reset exercise progression to defaults
         const defaultProgression = {
@@ -228,9 +260,7 @@ export const SettingsScreen: React.FC = () => {
             deadlift: 5,
             overheadPress: 2.5,
         };
-        Object.entries(defaultProgression).forEach(([exercise, progression]) => {
-            updateExerciseProgression(exercise as keyof typeof exerciseProgression, progression);
-        });
+        setExerciseProgression(defaultProgression);
 
         // Reset 1RM to defaults
         const defaultOneRepMax = {
@@ -239,15 +269,13 @@ export const SettingsScreen: React.FC = () => {
             deadlift: 180,
             overheadPress: 70,
         };
-        Object.entries(defaultOneRepMax).forEach(([exercise, weight]) => {
-            updateOneRepMax(exercise as keyof typeof oneRepMax, weight);
-        });
+        setOneRepMax(defaultOneRepMax);
 
         // Reset training max percentage to defaults
         const defaultTrainingMax = {
             percentage: 90,
         };
-        updateTrainingMaxPercentage(defaultTrainingMax.percentage);
+        setTrainingMaxPercentage(defaultTrainingMax);
 
         // Reset warm-up sets to defaults
         const defaultWarmup = {
@@ -256,16 +284,7 @@ export const SettingsScreen: React.FC = () => {
             set3: { percentage: 60, reps: 3 },
             enabled: true,
         };
-        // Update each warm-up set
-        Object.entries(defaultWarmup.set1).forEach(([field, value]) => {
-            updateWarmupSet('set1', field as 'percentage' | 'reps', value);
-        });
-        Object.entries(defaultWarmup.set2).forEach(([field, value]) => {
-            updateWarmupSet('set2', field as 'percentage' | 'reps', value);
-        });
-        Object.entries(defaultWarmup.set3).forEach(([field, value]) => {
-            updateWarmupSet('set3', field as 'percentage' | 'reps', value);
-        });
+        setWarmupSets(defaultWarmup);
 
         // Update local state for progression inputs
         setProgressionInputs({
@@ -313,11 +332,42 @@ export const SettingsScreen: React.FC = () => {
                 AsyncStorage.removeItem('workout_currentWeek'),
             ]);
 
+            // Reset settings to empty values to force onboarding
+            const emptySchedule = {
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            };
+            const emptyProgression = {
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            };
+            const emptyOneRepMax = {
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            };
+            const emptyTrainingMax = {
+                percentage: 0,
+            };
+
+            // Save empty values
+            await Promise.all([
+                setWorkoutSchedule(emptySchedule),
+                setExerciseProgression(emptyProgression),
+                setOneRepMax(emptyOneRepMax),
+                setTrainingMaxPercentage(emptyTrainingMax),
+            ]);
+
             setResetDataModalVisible(false);
 
             Alert.alert(
                 'Data Reset',
-                'All workout data has been cleared. Your settings remain unchanged.',
+                'All workout data has been cleared and settings reset. You will need to complete setup again.',
                 [{ text: 'OK' }]
             );
         } catch (error) {
@@ -625,7 +675,7 @@ export const SettingsScreen: React.FC = () => {
                                 lineHeight: 16,
                             }}
                         >
-                            This action will reset all settings to their default values. Your workout history and personal records will not be affected.
+                            This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will also be reset to defaults.
                         </Text>
                     </View>
 
@@ -779,7 +829,7 @@ export const SettingsScreen: React.FC = () => {
                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                             }}
                         >
-                            This will permanently delete all your workout data. This action cannot be undone.
+                            This will permanently delete all your workout data and reset your settings. This action cannot be undone.
                         </Text>
                     </View>
 
@@ -814,7 +864,7 @@ export const SettingsScreen: React.FC = () => {
                                 lineHeight: 16,
                             }}
                         >
-                            This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will remain unchanged.
+                            This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will also be reset to defaults.
                         </Text>
                     </View>
 
@@ -862,6 +912,14 @@ export const SettingsScreen: React.FC = () => {
                                 }}
                             >
                                 • Current cycle and week progress
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • All app settings (workout schedule, progression, 1RM, etc.)
                             </Text>
                         </View>
                     </View>

@@ -107,6 +107,13 @@ interface SettingsContextType {
     // Onboarding
     isOnboardingNeeded: () => boolean;
     completeOnboarding: () => void;
+    getMissingOnboardingItems: () => {
+        workoutSchedule: boolean;
+        exerciseProgression: boolean;
+        oneRepMax: boolean;
+        trainingMaxPercentage: boolean;
+    };
+    getOnboardingProgress: () => number;
 }
 
 const defaultSchedule: WorkoutSchedule = {
@@ -132,7 +139,7 @@ const defaultOneRepMax: OneRepMax = {
 };
 
 const defaultTrainingMaxPercentage: TrainingMaxPercentage = {
-    percentage: 90,
+    percentage: 0,
 };
 
 const defaultWorkingSetPercentages: WorkingSetPercentages = {
@@ -456,7 +463,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         // Check if 1RM values are set
         const hasOneRepMax = Object.values(oneRepMax).every(value => value > 0);
 
-        return !hasSchedule || !hasProgression || !hasOneRepMax;
+        // Check if training max percentage is set (default is 90, so we check if it's not 0)
+        const hasTrainingMaxPercentage = trainingMaxPercentage.percentage > 0;
+
+        return !hasSchedule || !hasProgression || !hasOneRepMax || !hasTrainingMaxPercentage;
     };
 
     // Complete onboarding by setting default values
@@ -482,12 +492,50 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             overheadPress: 70,
         };
 
+        const defaultTrainingMaxPercentage: TrainingMaxPercentage = {
+            percentage: 90,
+        };
+
         // Save all default values
         await Promise.all([
             saveWorkoutSchedule(defaultSchedule),
             saveExerciseProgression(defaultProgression),
             saveOneRepMax(defaultOneRepMax),
+            saveTrainingMaxPercentage(defaultTrainingMaxPercentage),
         ]);
+    };
+
+    const getMissingOnboardingItems = (): {
+        workoutSchedule: boolean;
+        exerciseProgression: boolean;
+        oneRepMax: boolean;
+        trainingMaxPercentage: boolean;
+    } => {
+        // Check if workout schedule is empty
+        const hasSchedule = Object.values(workoutSchedule).every(day => day !== '');
+
+        // Check if progression values are set
+        const hasProgression = Object.values(exerciseProgression).every(value => value > 0);
+
+        // Check if 1RM values are set
+        const hasOneRepMax = Object.values(oneRepMax).every(value => value > 0);
+
+        // Check if training max percentage is set (default is 90, so we check if it's not 0)
+        const hasTrainingMaxPercentage = trainingMaxPercentage.percentage > 0;
+
+        return {
+            workoutSchedule: !hasSchedule,
+            exerciseProgression: !hasProgression,
+            oneRepMax: !hasOneRepMax,
+            trainingMaxPercentage: !hasTrainingMaxPercentage,
+        };
+    };
+
+    const getOnboardingProgress = (): number => {
+        const missingItems = getMissingOnboardingItems();
+        const totalItems = 4; // workoutSchedule, exerciseProgression, oneRepMax, trainingMaxPercentage
+        const completedItems = totalItems - Object.values(missingItems).filter(Boolean).length;
+        return Math.round((completedItems / totalItems) * 100);
     };
 
     const value = {
@@ -523,6 +571,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         // Onboarding
         isOnboardingNeeded,
         completeOnboarding,
+        getMissingOnboardingItems,
+        getOnboardingProgress,
     };
 
     return (

@@ -28,13 +28,13 @@ const AppContent = () => {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'home':
-        return <HomeScreen />;
+        return <HomeScreen onNavigate={handleNavigate} />;
       case 'profile':
         return <HistoryScreen />;
       case 'settings':
         return <SettingsScreen />;
       default:
-        return <HomeScreen />;
+        return <HomeScreen onNavigate={handleNavigate} />;
     }
   };
 
