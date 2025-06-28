@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TextInput, TouchableOpacity, ScrollView, Alert, View, Text } from 'react-native';
 import Modal from 'react-native-modal';
-import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle, CheckCircle, X } from 'lucide-react-native';
+import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle, CheckCircle, X, Database, Settings } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { DataBackup } from '../components/DataBackup';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const SettingsScreen: React.FC = () => {
     const { theme, setTheme } = useTheme();
@@ -33,10 +34,11 @@ export const SettingsScreen: React.FC = () => {
         overheadPress: exerciseProgression.overheadPress.toString(),
     });
 
-    // Local state for modal
+    // Local state for modals
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
-    const [resetModalVisible, setResetModalVisible] = useState(false);
+    const [resetSettingsModalVisible, setResetSettingsModalVisible] = useState(false);
+    const [resetDataModalVisible, setResetDataModalVisible] = useState(false);
 
     const themeOptions = [
         { value: 'light' as const, label: 'Light', description: 'Always use light theme' },
@@ -88,7 +90,11 @@ export const SettingsScreen: React.FC = () => {
     };
 
     const handleResetSettings = () => {
-        setResetModalVisible(true);
+        setResetSettingsModalVisible(true);
+    };
+
+    const handleResetData = () => {
+        setResetDataModalVisible(true);
     };
 
     const confirmResetSettings = () => {
@@ -129,13 +135,41 @@ export const SettingsScreen: React.FC = () => {
             overheadPress: defaultProgression.overheadPress.toString(),
         });
 
-        setResetModalVisible(false);
+        setResetSettingsModalVisible(false);
 
         Alert.alert(
             'Settings Reset',
             'All settings have been reset to their default values.',
             [{ text: 'OK' }]
         );
+    };
+
+    const confirmResetData = async () => {
+        try {
+            // Clear all workout-related data from AsyncStorage
+            await Promise.all([
+                AsyncStorage.removeItem('workout_trainingMaxes'),
+                AsyncStorage.removeItem('workout_personalRecords'),
+                AsyncStorage.removeItem('workout_history'),
+                AsyncStorage.removeItem('workout_currentCycle'),
+                AsyncStorage.removeItem('workout_currentWeek'),
+            ]);
+
+            setResetDataModalVisible(false);
+
+            Alert.alert(
+                'Data Reset',
+                'All workout data has been cleared. Your settings remain unchanged.',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Error resetting data:', error);
+            Alert.alert(
+                'Error',
+                'Failed to reset data. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
     const getAvailableDays = (currentExercise: keyof typeof workoutSchedule) => {
@@ -370,8 +404,8 @@ export const SettingsScreen: React.FC = () => {
     const renderResetSettingsModal = () => {
         return (
             <Modal
-                isVisible={resetModalVisible}
-                onBackdropPress={() => setResetModalVisible(false)}
+                isVisible={resetSettingsModalVisible}
+                onBackdropPress={() => setResetSettingsModalVisible(false)}
                 style={{
                     justifyContent: 'center',
                     alignItems: 'center',
@@ -395,7 +429,7 @@ export const SettingsScreen: React.FC = () => {
                     {/* Header */}
                     <View style={{ marginBottom: 20 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                            <RotateCcw size={24} color={isDark ? COLORS.error : COLORS.errorDark} />
+                            <Settings size={24} color={isDark ? COLORS.error : COLORS.errorDark} />
                             <Text
                                 style={{
                                     fontSize: 20,
@@ -404,7 +438,7 @@ export const SettingsScreen: React.FC = () => {
                                     marginLeft: 8,
                                 }}
                             >
-                                Reset All Settings
+                                Reset Settings
                             </Text>
                         </View>
                         <Text
@@ -471,7 +505,7 @@ export const SettingsScreen: React.FC = () => {
                                     color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                 }}
                             >
-                                • Theme: System (follow device settings)
+                                • Theme: Light
                             </Text>
                             <Text
                                 style={{
@@ -520,11 +554,192 @@ export const SettingsScreen: React.FC = () => {
                         >
                             <CheckCircle size={32} color="white" />
                             <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
-                                Reset All Settings
+                                Reset Settings
                             </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            onPress={() => setResetModalVisible(false)}
+                            onPress={() => setResetSettingsModalVisible(false)}
+                            style={{
+                                backgroundColor: 'transparent',
+                                padding: 20,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                borderWidth: 2,
+                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <X size={32} color={isDark ? COLORS.textDark : COLORS.text} />
+                            <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
+
+    const renderResetDataModal = () => {
+        return (
+            <Modal
+                isVisible={resetDataModalVisible}
+                onBackdropPress={() => setResetDataModalVisible(false)}
+                style={{
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: 20,
+                }}
+            >
+                <View
+                    style={{
+                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                        borderRadius: 12,
+                        padding: 20,
+                        width: '100%',
+                        maxWidth: 400,
+                        shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 8,
+                        elevation: 10,
+                    }}
+                >
+                    {/* Header */}
+                    <View style={{ marginBottom: 20 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <Database size={24} color={isDark ? COLORS.error : COLORS.errorDark} />
+                            <Text
+                                style={{
+                                    fontSize: 20,
+                                    fontWeight: 'bold',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginLeft: 8,
+                                }}
+                            >
+                                Reset Workout Data
+                            </Text>
+                        </View>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                            }}
+                        >
+                            This will permanently delete all your workout data. This action cannot be undone.
+                        </Text>
+                    </View>
+
+                    {/* Warning */}
+                    <View
+                        style={{
+                            backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                            padding: 16,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                            marginBottom: 20,
+                        }}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                            <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                            <Text
+                                style={{
+                                    fontSize: 14,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                    marginLeft: 6,
+                                }}
+                            >
+                                Critical Warning
+                            </Text>
+                        </View>
+                        <Text
+                            style={{
+                                fontSize: 12,
+                                color: isDark ? COLORS.error : COLORS.errorDark,
+                                lineHeight: 16,
+                            }}
+                        >
+                            This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will remain unchanged.
+                        </Text>
+                    </View>
+
+                    {/* What will be reset */}
+                    <View style={{ marginBottom: 20 }}>
+                        <Text
+                            style={{
+                                fontSize: 14,
+                                fontWeight: '600',
+                                color: isDark ? COLORS.textDark : COLORS.text,
+                                marginBottom: 8,
+                            }}
+                        >
+                            Data that will be deleted:
+                        </Text>
+                        <View style={{ gap: 4 }}>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • All workout history
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Personal records
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Training maxes
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                }}
+                            >
+                                • Current cycle and week progress
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Buttons */}
+                    <View style={{ gap: 12 }}>
+                        <TouchableOpacity
+                            onPress={confirmResetData}
+                            style={{
+                                backgroundColor: isDark ? COLORS.error : COLORS.errorDark,
+                                padding: 20,
+                                borderRadius: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 4,
+                                elevation: 4,
+                            }}
+                            activeOpacity={0.8}
+                        >
+                            <CheckCircle size={32} color="white" />
+                            <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
+                                Delete All Data
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setResetDataModalVisible(false)}
                             style={{
                                 backgroundColor: 'transparent',
                                 padding: 20,
@@ -746,9 +961,9 @@ export const SettingsScreen: React.FC = () => {
                         }}
                     />
 
-                    {/* Reset Settings */}
+                    {/* Reset Options */}
                     <Card
-                        title="Reset Settings"
+                        title="Reset Options"
                         borderColor={isDark ? COLORS.errorLight : COLORS.error}
                     >
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
@@ -760,60 +975,88 @@ export const SettingsScreen: React.FC = () => {
                                     fontSize: 14,
                                 }}
                             >
-                                Reset all settings to their default values
+                                Reset settings or clear workout data
                             </Text>
                         </View>
 
-                        {/* Warning */}
-                        <View
-                            style={{
-                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
-                                padding: 12,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                                marginBottom: 16,
-                            }}
-                        >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                <AlertTriangle size={14} color={isDark ? COLORS.error : COLORS.errorDark} />
+                        {/* Reset Settings Section */}
+                        <View style={{ marginBottom: 20 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <Settings size={16} color={isDark ? COLORS.warning : COLORS.warningDark} />
                                 <Text
                                     style={{
-                                        fontSize: 12,
+                                        fontSize: 16,
                                         fontWeight: '600',
-                                        color: isDark ? COLORS.error : COLORS.errorDark,
-                                        marginLeft: 6,
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        marginLeft: 8,
                                     }}
                                 >
-                                    Alert
+                                    Reset Settings
                                 </Text>
                             </View>
                             <Text
                                 style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
                                 }}
                             >
-                                This will reset your theme, units, workout schedule, and exercise progression to their default values. Your workout history and personal records will not be affected.
+                                Reset theme, units, workout schedule, and exercise progression to default values. Your workout data will not be affected.
                             </Text>
+                            <Button
+                                onPress={handleResetSettings}
+                                variant="outline"
+                                fullWidth
+                                style={{
+                                    borderColor: isDark ? COLORS.warning : COLORS.warningDark,
+                                }}
+                            >
+                                Reset Settings
+                            </Button>
                         </View>
 
-                        <Button
-                            onPress={handleResetSettings}
-                            variant="outline"
-                            fullWidth
-                            style={{
-                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                            }}
-                        >
-                            Reset All Settings
-                        </Button>
+                        {/* Reset Data Section */}
+                        <View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <Database size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    style={{
+                                        fontSize: 16,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        marginLeft: 8,
+                                    }}
+                                >
+                                    Clear Workout Data
+                                </Text>
+                            </View>
+                            <Text
+                                style={{
+                                    fontSize: 14,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Permanently delete all workout history, personal records, training maxes, and progress data. Your settings will remain unchanged.
+                            </Text>
+                            <Button
+                                onPress={handleResetData}
+                                variant="outline"
+                                fullWidth
+                                style={{
+                                    borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                }}
+                            >
+                                Clear All Data
+                            </Button>
+                        </View>
                     </Card>
                 </ScrollView>
             </View>
 
             {renderDaySelectorModal()}
             {renderResetSettingsModal()}
+            {renderResetDataModal()}
         </>
     );
 }; 
