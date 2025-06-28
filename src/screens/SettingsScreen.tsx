@@ -330,23 +330,19 @@ export const SettingsScreen: React.FC = () => {
     };
 
     const renderDaySelectorModal = () => {
-        if (!selectedExercise) return null;
-
-        const availableDays = getAvailableDays(selectedExercise);
-        const exerciseName = exerciseNames[selectedExercise];
-
         return (
             <Modal
                 isVisible={modalVisible}
-                onBackdropPress={() => {
-                    setModalVisible(false);
-                    setSelectedExercise(null);
-                }}
+                onBackdropPress={() => setModalVisible(false)}
                 style={{
                     justifyContent: 'center',
                     alignItems: 'center',
                     padding: 20,
                 }}
+                backdropOpacity={0.5}
+                useNativeDriver={true}
+                hideModalContentWhileAnimating={true}
+                statusBarTranslucent={true}
             >
                 <View
                     style={{
@@ -369,120 +365,97 @@ export const SettingsScreen: React.FC = () => {
                                 fontSize: 20,
                                 fontWeight: 'bold',
                                 color: isDark ? COLORS.textDark : COLORS.text,
-                                marginBottom: 8,
+                                textAlign: 'center',
                             }}
                         >
-                            Select Day for {exerciseName}
+                            Select Day
                         </Text>
                         <Text
                             style={{
                                 fontSize: 14,
                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                textAlign: 'center',
+                                marginTop: 8,
                             }}
                         >
-                            Choose which day to perform this exercise
+                            Choose which day to perform {selectedExercise ? exerciseNames[selectedExercise] : 'this exercise'}
                         </Text>
                     </View>
 
                     {/* Day Options */}
                     <View style={{ gap: 8 }}>
-                        {availableDays.map((dayInfo) => (
+                        {selectedExercise && getAvailableDays(selectedExercise).map(({ day, isCurrent, hasConflict, conflictingExercise }) => (
                             <TouchableOpacity
-                                key={dayInfo.day}
-                                onPress={() => handleDaySelect(selectedExercise, dayInfo.day)}
+                                key={day}
+                                onPress={() => handleDaySelect(selectedExercise, day)}
                                 style={{
-                                    padding: 16,
-                                    backgroundColor: dayInfo.isCurrent
-                                        ? (isDark ? COLORS.primary + '20' : COLORS.primaryDark + '20')
-                                        : dayInfo.hasConflict && !dayInfo.isCurrent
-                                            ? (isDark ? COLORS.warningDark + '20' : COLORS.warning + '20')
+                                    backgroundColor: isCurrent
+                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                        : hasConflict
+                                            ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
                                             : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
                                     borderWidth: 1,
-                                    borderColor: dayInfo.isCurrent
+                                    borderColor: isCurrent
                                         ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                        : dayInfo.hasConflict && !dayInfo.isCurrent
-                                            ? (isDark ? COLORS.warning : COLORS.warningDark)
+                                        : hasConflict
+                                            ? (isDark ? COLORS.error : COLORS.errorDark)
                                             : (isDark ? COLORS.borderDark : COLORS.border),
                                     borderRadius: 8,
+                                    padding: 16,
+                                    alignItems: 'center',
                                 }}
+                                activeOpacity={0.8}
+                                disabled={hasConflict}
                             >
-                                <View>
+                                <Text
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: '600',
+                                        color: isCurrent
+                                            ? 'white'
+                                            : hasConflict
+                                                ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                    }}
+                                >
+                                    {day}
+                                </Text>
+                                {isCurrent && (
+                                    <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                )}
+                                {hasConflict && (
                                     <Text
                                         style={{
-                                            fontSize: 16,
-                                            color: dayInfo.isCurrent
-                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                : dayInfo.hasConflict
-                                                    ? (isDark ? COLORS.warning : COLORS.warningDark)
-                                                    : (isDark ? COLORS.textDark : COLORS.text),
-                                            fontWeight: dayInfo.isCurrent ? "600" : "400"
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.error : COLORS.errorDark,
+                                            marginTop: 4,
                                         }}
                                     >
-                                        {dayInfo.day}
+                                        Conflicts with {conflictingExercise}
                                     </Text>
-                                    {dayInfo.isCurrent && (
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                color: isDark ? COLORS.primary : COLORS.primaryDark,
-                                                marginTop: 2,
-                                            }}
-                                        >
-                                            Currently selected
-                                        </Text>
-                                    )}
-                                    {dayInfo.hasConflict && !dayInfo.isCurrent && (
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary,
-                                                marginTop: 2,
-                                            }}
-                                        >
-                                            Conflicts with {dayInfo.conflictingExercise}
-                                        </Text>
-                                    )}
-                                    {!dayInfo.hasConflict && !dayInfo.isCurrent && (
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                color: isDark ? COLORS.success : COLORS.successDark,
-                                                marginTop: 2,
-                                            }}
-                                        >
-                                            Available
-                                        </Text>
-                                    )}
-                                </View>
+                                )}
                             </TouchableOpacity>
                         ))}
                     </View>
 
                     {/* Cancel Button */}
-                    <View style={{ marginTop: 20 }}>
-                        <TouchableOpacity
-                            onPress={() => {
-                                setModalVisible(false);
-                                setSelectedExercise(null);
-                            }}
-                            style={{
-                                backgroundColor: 'transparent',
-                                padding: 20,
-                                borderRadius: 12,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexDirection: 'row',
-                                borderWidth: 2,
-                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                            }}
-                            activeOpacity={0.8}
-                        >
-                            <X size={32} color={isDark ? COLORS.textDark : COLORS.text} />
-                            <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 18, fontWeight: 'bold', marginLeft: 12 }}>
-                                Cancel
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        onPress={() => setModalVisible(false)}
+                        style={{
+                            backgroundColor: 'transparent',
+                            padding: 16,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            marginTop: 16,
+                            borderWidth: 1,
+                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                        }}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: '600' }}>
+                            Cancel
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </Modal>
         );
@@ -498,6 +471,10 @@ export const SettingsScreen: React.FC = () => {
                     alignItems: 'center',
                     padding: 20,
                 }}
+                backdropOpacity={0.5}
+                useNativeDriver={true}
+                hideModalContentWhileAnimating={true}
+                statusBarTranslucent={true}
             >
                 <View
                     style={{
@@ -679,6 +656,10 @@ export const SettingsScreen: React.FC = () => {
                     alignItems: 'center',
                     padding: 20,
                 }}
+                backdropOpacity={0.5}
+                useNativeDriver={true}
+                hideModalContentWhileAnimating={true}
+                statusBarTranslucent={true}
             >
                 <View
                     style={{
@@ -860,6 +841,10 @@ export const SettingsScreen: React.FC = () => {
                     alignItems: 'center',
                     padding: 20,
                 }}
+                backdropOpacity={0.5}
+                useNativeDriver={true}
+                hideModalContentWhileAnimating={true}
+                statusBarTranslucent={true}
             >
                 <View
                     style={{
