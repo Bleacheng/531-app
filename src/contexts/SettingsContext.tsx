@@ -104,28 +104,31 @@ interface SettingsContextType {
     saveScrollPosition: (screen: keyof ScrollPositions, position: number) => void;
     getScrollPosition: (screen: keyof ScrollPositions) => number;
     isLoading: boolean;
+    // Onboarding
+    isOnboardingNeeded: () => boolean;
+    completeOnboarding: () => void;
 }
 
 const defaultSchedule: WorkoutSchedule = {
-    benchPress: 'Monday',
-    squat: 'Tuesday',
-    deadlift: 'Thursday',
-    overheadPress: 'Friday',
+    benchPress: '',
+    squat: '',
+    deadlift: '',
+    overheadPress: '',
 };
 
 const defaultProgression: ExerciseProgression = {
-    benchPress: 2.5,
-    squat: 5,
-    deadlift: 5,
-    overheadPress: 2.5,
+    benchPress: 0,
+    squat: 0,
+    deadlift: 0,
+    overheadPress: 0,
 };
 
 // Default 5/3/1 Program Settings
 const defaultOneRepMax: OneRepMax = {
-    benchPress: 100,
-    squat: 140,
-    deadlift: 180,
-    overheadPress: 70,
+    benchPress: 0,
+    squat: 0,
+    deadlift: 0,
+    overheadPress: 0,
 };
 
 const defaultTrainingMaxPercentage: TrainingMaxPercentage = {
@@ -442,6 +445,51 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         return scrollPositions[screen];
     };
 
+    // Check if onboarding is needed
+    const isOnboardingNeeded = (): boolean => {
+        // Check if workout schedule is empty
+        const hasSchedule = Object.values(workoutSchedule).every(day => day !== '');
+
+        // Check if progression values are set
+        const hasProgression = Object.values(exerciseProgression).every(value => value > 0);
+
+        // Check if 1RM values are set
+        const hasOneRepMax = Object.values(oneRepMax).every(value => value > 0);
+
+        return !hasSchedule || !hasProgression || !hasOneRepMax;
+    };
+
+    // Complete onboarding by setting default values
+    const completeOnboarding = async () => {
+        const defaultSchedule: WorkoutSchedule = {
+            benchPress: 'Monday',
+            squat: 'Tuesday',
+            deadlift: 'Thursday',
+            overheadPress: 'Friday',
+        };
+
+        const defaultProgression: ExerciseProgression = {
+            benchPress: 2.5,
+            squat: 5,
+            deadlift: 5,
+            overheadPress: 2.5,
+        };
+
+        const defaultOneRepMax: OneRepMax = {
+            benchPress: 100,
+            squat: 140,
+            deadlift: 180,
+            overheadPress: 70,
+        };
+
+        // Save all default values
+        await Promise.all([
+            saveWorkoutSchedule(defaultSchedule),
+            saveExerciseProgression(defaultProgression),
+            saveOneRepMax(defaultOneRepMax),
+        ]);
+    };
+
     const value = {
         unit,
         setUnit: saveUnit,
@@ -472,6 +520,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         saveScrollPosition,
         getScrollPosition,
         isLoading,
+        // Onboarding
+        isOnboardingNeeded,
+        completeOnboarding,
     };
 
     return (
