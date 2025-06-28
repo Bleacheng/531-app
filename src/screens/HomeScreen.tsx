@@ -27,7 +27,12 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         updateOneRepMax,
         getMissingOnboardingItems,
         getOnboardingProgress,
-        updateTrainingMaxPercentage
+        updateTrainingMaxPercentage,
+        currentCycle,
+        currentWeek,
+        workingSetPercentages,
+        trainingMaxPercentage,
+        advanceToNextWeek
     } = useSettings();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
@@ -273,99 +278,167 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
     const missingItems = getMissingOnboardingItems();
     const onboardingProgress = getOnboardingProgress();
 
-    // Helper function to calculate workout weight based on progression
-    const calculateWorkoutWeight = (exercise: string, baseWeight: number, cycle: number) => {
-        const progressionMap: { [key: string]: number } = {
-            'Bench Press': exerciseProgression.benchPress,
-            'Squat': exerciseProgression.squat,
-            'Deadlift': exerciseProgression.deadlift,
-            'Overhead Press': exerciseProgression.overheadPress,
-        };
-
-        const progression = progressionMap[exercise] || 2.5;
-        return baseWeight + (progression * (cycle - 1));
+    // Helper function to round weight to nearest 2.5kg
+    const roundToNearest2_5 = (weight: number): number => {
+        return Math.round(weight / 2.5) * 2.5;
     };
 
-    // Example usage:
-    // const benchWeight = calculateWorkoutWeight('Bench Press', 80, 3); // 80 + (2.5 * 2) = 85kg
+    // Calculate training max for an exercise
+    const calculateTrainingMax = (exercise: keyof typeof oneRepMax, cycle: number): number => {
+        const baseOneRM = oneRepMax[exercise];
+        const trainingMaxPercent = trainingMaxPercentage.percentage / 100;
+        const progression = exerciseProgression[exercise];
 
-    // Get current week's start date (Monday)
-    const getWeekStart = () => {
-        const now = new Date();
-        const dayOfWeek = now.getDay();
-        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        const monday = new Date(now);
-        monday.setDate(now.getDate() - daysToMonday);
-        return monday;
+        // Training max increases by progression amount each cycle
+        const cycleIncrease = progression * (cycle - 1);
+        const adjustedOneRM = baseOneRM + cycleIncrease;
+        const trainingMax = adjustedOneRM * trainingMaxPercent;
+
+        return roundToNearest2_5(trainingMax);
     };
 
-    const weekStart = getWeekStart();
+    // Calculate workout weight for a specific week and exercise
+    const calculateWorkoutWeight = (exercise: keyof typeof oneRepMax, week: number, set: 1 | 2 | 3): number => {
+        const trainingMax = calculateTrainingMax(exercise, currentCycle);
+        const weekPercentages = workingSetPercentages[`week${week}` as keyof typeof workingSetPercentages];
+        const percentage = weekPercentages[`set${set}` as keyof typeof weekPercentages];
 
-    // Helper function to get day offset
-    const getDayOffset = (day: string) => {
+        const weight = (trainingMax * percentage) / 100;
+        return roundToNearest2_5(weight);
+    };
+
+    // Get next occurrence of a day of the week
+    const getNextDayOccurrence = (dayName: string, fromDate: Date = new Date()): Date => {
         const dayMap: { [key: string]: number } = {
-            'Monday': 0,
-            'Tuesday': 1,
-            'Wednesday': 2,
-            'Thursday': 3,
-            'Friday': 4,
-            'Saturday': 5,
-            'Sunday': 6
+            'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
+            'Friday': 5, 'Saturday': 6, 'Sunday': 0
         };
-        return dayMap[day] || 0;
+
+        const targetDay = dayMap[dayName];
+        const currentDay = fromDate.getDay();
+        const daysUntilTarget = (targetDay - currentDay + 7) % 7;
+
+        const nextDate = new Date(fromDate);
+        nextDate.setDate(fromDate.getDate() + daysUntilTarget);
+        return nextDate;
     };
 
     // Memoize today's date to prevent recalculation on every render
     const today = useMemo(() => new Date(), []);
 
-    // This week's workouts - Empty until real workout data is implemented
-    const thisWeeksWorkouts = useMemo(() => {
-        // Return empty array until real workout tracking is implemented
-        return [] as Array<{
-            lift: string;
-            topSet: string;
-            weight: string;
-            day: string;
-            date: Date;
-            completed: boolean;
-        }>;
-    }, []);
-
-    // Memoize today's workout to prevent recalculation
-    const todaysWorkout = useMemo(() => {
-        return thisWeeksWorkouts.find(workout =>
-            workout.date.toDateString() === today.toDateString()
-        );
-    }, [thisWeeksWorkouts, today]);
-
-    // Memoize completed and upcoming workouts
-    const completedWorkouts = useMemo(() =>
-        thisWeeksWorkouts.filter(workout => workout.completed),
-        [thisWeeksWorkouts]
-    );
-
-    const upcomingWorkouts = useMemo(() =>
-        thisWeeksWorkouts.filter(workout => !workout.completed),
-        [thisWeeksWorkouts]
-    );
-
-    // 5/3/1 4-week cycle overview - Empty until real cycle data is implemented
+    // Generate cycle overview with proper dates and weights
     const cycleOverview = useMemo(() => {
-        // Return empty array until real cycle tracking is implemented
-        return [] as Array<{
-            week: number;
-            name: string;
-            description: string;
-            status: 'completed' | 'current' | 'upcoming';
-            lifts: Array<{
-                lift: string;
-                topSet: string;
-                weight: string;
-                reps: number | null;
-                passed: boolean | null;
-            }>;
-        }>;
-    }, []);
+        if (isOnboardingNeeded()) {
+            return [];
+        }
+
+        const cycleData = [];
+        const isDeloadWeek = currentWeek === 4;
+        const showNextCycle = isDeloadWeek;
+
+        // Generate current cycle weeks
+        for (let week = 1; week <= 4; week++) {
+            const weekStatus: 'completed' | 'current' | 'upcoming' =
+                week < currentWeek ? 'completed' :
+                    week === currentWeek ? 'current' : 'upcoming';
+
+            const weekNames = ['5/5/5+', '3/3/3+', '5/3/1+', 'Deload'];
+            const weekDescriptions = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+
+            // Calculate week start date based on first workout day
+            const firstWorkoutDay = Object.values(workoutSchedule).find(day => day !== '');
+            if (!firstWorkoutDay) continue;
+
+            const weekStartDate = getNextDayOccurrence(firstWorkoutDay, today);
+            weekStartDate.setDate(weekStartDate.getDate() + (week - 1) * 7);
+
+            const lifts = Object.entries(workoutSchedule).map(([exercise, day]) => {
+                const exerciseName = exerciseNames[exercise as keyof typeof exerciseNames];
+                const topSet = week === 4 ? '3×5' : '1×5+';
+
+                let weight: string;
+                if (week === 4) {
+                    // Deload week uses 40%, 50%, 60%
+                    const deloadWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, 4, 3);
+                    weight = formatWeight(deloadWeight);
+                } else {
+                    // Regular weeks use the top set percentage
+                    const topSetWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, week, 3);
+                    weight = formatWeight(topSetWeight);
+                }
+
+                return {
+                    lift: exerciseName,
+                    topSet,
+                    weight,
+                    reps: null, // Will be filled when workout is completed
+                    passed: null, // Will be filled when workout is completed
+                    scheduledDay: day,
+                    scheduledDate: getNextDayOccurrence(day, weekStartDate)
+                };
+            });
+
+            cycleData.push({
+                week,
+                name: `${weekNames[week - 1]} - Cycle ${currentCycle}`,
+                description: weekDescriptions[week - 1],
+                status: weekStatus,
+                lifts,
+                weekStartDate
+            });
+        }
+
+        // If in deload week, show next cycle preview
+        if (showNextCycle) {
+            const nextCycle = currentCycle + 1;
+
+            for (let week = 1; week <= 4; week++) {
+                const weekNames = ['5/5/5+', '3/3/3+', '5/3/1+', 'Deload'];
+                const weekDescriptions = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+
+                const firstWorkoutDay = Object.values(workoutSchedule).find(day => day !== '');
+                if (!firstWorkoutDay) continue;
+
+                const weekStartDate = getNextDayOccurrence(firstWorkoutDay, today);
+                weekStartDate.setDate(weekStartDate.getDate() + (week - 1) * 7 + 28); // +28 for next cycle
+
+                const lifts = Object.entries(workoutSchedule).map(([exercise, day]) => {
+                    const exerciseName = exerciseNames[exercise as keyof typeof exerciseNames];
+                    const topSet = week === 4 ? '3×5' : '1×5+';
+
+                    let weight: string;
+                    if (week === 4) {
+                        const deloadWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, 4, 3);
+                        weight = formatWeight(deloadWeight);
+                    } else {
+                        const topSetWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, week, 3);
+                        weight = formatWeight(topSetWeight);
+                    }
+
+                    return {
+                        lift: exerciseName,
+                        topSet,
+                        weight,
+                        reps: null,
+                        passed: null,
+                        scheduledDay: day,
+                        scheduledDate: getNextDayOccurrence(day, weekStartDate)
+                    };
+                });
+
+                cycleData.push({
+                    week,
+                    name: `${weekNames[week - 1]} - Cycle ${nextCycle} (Preview)`,
+                    description: weekDescriptions[week - 1],
+                    status: 'upcoming' as const,
+                    lifts,
+                    weekStartDate
+                });
+            }
+        }
+
+        return cycleData;
+    }, [currentCycle, currentWeek, workoutSchedule, oneRepMax, exerciseProgression, trainingMaxPercentage, workingSetPercentages, isOnboardingNeeded]);
 
     const getStatusIcon = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -573,12 +646,79 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                     fontSize: 16
                                 }}
                             >
-                                Week 3 - Cycle 1
+                                {currentWeek === 4 ? 'Deload Week' : `Week ${currentWeek}`} - Cycle {currentCycle}
                             </Text>
                         </View>
 
-                        {/* Empty State */}
-                        {thisWeeksWorkouts.length === 0 && (
+                        {/* Current Week's Workouts */}
+                        {cycleOverview.filter(week => week.status === 'current').map((currentWeek, weekIndex) => (
+                            <View key={weekIndex} style={{ gap: 12 }}>
+                                {currentWeek.lifts.map((lift, liftIndex) => (
+                                    <View
+                                        key={liftIndex}
+                                        style={{
+                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                            padding: 16,
+                                            borderRadius: 12,
+                                            borderWidth: 1,
+                                            borderColor: isDark ? COLORS.primary : COLORS.primaryDark,
+                                        }}
+                                    >
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                            <Text
+                                                style={{
+                                                    fontSize: 16,
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                    fontWeight: '600'
+                                                }}
+                                            >
+                                                {lift.lift}
+                                            </Text>
+                                            <Badge
+                                                label={lift.scheduledDay}
+                                                variant="primary"
+                                            />
+                                        </View>
+                                        <View style={{ marginBottom: 12 }}>
+                                            <Text
+                                                style={{
+                                                    fontSize: 14,
+                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                }}
+                                            >
+                                                Top Set: {lift.topSet}
+                                            </Text>
+                                            <Text
+                                                style={{
+                                                    fontSize: 14,
+                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                }}
+                                            >
+                                                Weight: {lift.weight}
+                                            </Text>
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
+                                                }}
+                                            >
+                                                {formatDate(lift.scheduledDate)}
+                                            </Text>
+                                        </View>
+                                        <Button
+                                            onPress={() => handleStartWorkout(lift.lift)}
+                                            variant="primary"
+                                            fullWidth
+                                        >
+                                            Start Workout
+                                        </Button>
+                                    </View>
+                                ))}
+                            </View>
+                        ))}
+
+                        {/* Empty State if no current week */}
+                        {cycleOverview.filter(week => week.status === 'current').length === 0 && (
                             <View style={{ alignItems: 'center', padding: 20 }}>
                                 <Calendar size={48} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} style={{ marginBottom: 16 }} />
                                 <Text
@@ -590,7 +730,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                         marginBottom: 8,
                                     }}
                                 >
-                                    No Workouts Scheduled
+                                    No Current Week
                                 </Text>
                                 <Text
                                     style={{
@@ -600,251 +740,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                         lineHeight: 20,
                                     }}
                                 >
-                                    Your workout plan will appear here once you start tracking your 5/3/1 program.
+                                    Your current week's workouts will appear here.
                                 </Text>
-                            </View>
-                        )}
-
-                        {/* Today's Workout */}
-                        {todaysWorkout && (
-                            <View style={{ gap: 12, marginBottom: 16 }}>
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        fontWeight: '600',
-                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                        marginBottom: 8
-                                    }}
-                                >
-                                    Today
-                                </Text>
-                                <View
-                                    style={{
-                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                        padding: 16,
-                                        borderRadius: 12,
-                                        borderWidth: 1,
-                                        borderColor: isDark ? COLORS.primary : COLORS.primaryDark,
-                                    }}
-                                >
-                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                        <Text
-                                            style={{
-                                                fontSize: 16,
-                                                color: isDark ? COLORS.textDark : COLORS.text,
-                                                fontWeight: '600'
-                                            }}
-                                        >
-                                            {todaysWorkout.lift}
-                                        </Text>
-                                        <Badge
-                                            label={todaysWorkout.day}
-                                            variant={todaysWorkout.completed ? "success" : "primary"}
-                                        />
-                                    </View>
-                                    <View style={{ marginBottom: 12 }}>
-                                        <Text
-                                            style={{
-                                                fontSize: 14,
-                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                            }}
-                                        >
-                                            Top Set: {todaysWorkout.topSet}
-                                        </Text>
-                                        <Text
-                                            style={{
-                                                fontSize: 14,
-                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                            }}
-                                        >
-                                            Weight: {todaysWorkout.weight}
-                                        </Text>
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
-                                            }}
-                                        >
-                                            {formatDate(todaysWorkout.date)}
-                                        </Text>
-                                    </View>
-                                    {todaysWorkout.completed ? (
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                color: COLORS.success,
-                                                fontWeight: '500'
-                                            }}
-                                        >
-                                            ✓ Completed
-                                        </Text>
-                                    ) : (
-                                        <Button
-                                            onPress={() => handleStartWorkout(todaysWorkout.lift)}
-                                            variant="primary"
-                                            fullWidth
-                                        >
-                                            Start Workout
-                                        </Button>
-                                    )}
-                                </View>
-                            </View>
-                        )}
-
-                        {/* Upcoming Workouts */}
-                        {upcomingWorkouts.length > 0 && (
-                            <View style={{ gap: 12, marginBottom: 16 }}>
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        fontWeight: '600',
-                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                        marginBottom: 8
-                                    }}
-                                >
-                                    Upcoming
-                                </Text>
-                                {upcomingWorkouts.map((workout, index) => (
-                                    <View
-                                        key={index}
-                                        style={{
-                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                            padding: 16,
-                                            borderRadius: 12,
-                                            borderWidth: 1,
-                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                        }}
-                                    >
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                {workout.lift}
-                                            </Text>
-                                            <Badge
-                                                label={workout.day}
-                                                variant="complementary"
-                                            />
-                                        </View>
-                                        <View style={{ marginBottom: 12 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                }}
-                                            >
-                                                Top Set: {workout.topSet}
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                }}
-                                            >
-                                                Weight: {workout.weight}
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
-                                                }}
-                                            >
-                                                {formatDate(workout.date)}
-                                            </Text>
-                                        </View>
-                                        <Button
-                                            onPress={() => handleStartWorkout(workout.lift)}
-                                            variant="primary"
-                                            fullWidth
-                                        >
-                                            Start Workout
-                                        </Button>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-
-                        {/* Completed Workouts */}
-                        {completedWorkouts.length > 0 && (
-                            <View style={{ gap: 12 }}>
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        fontWeight: '600',
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                        marginBottom: 8
-                                    }}
-                                >
-                                    Completed
-                                </Text>
-                                {completedWorkouts.map((workout, index) => (
-                                    <View
-                                        key={index}
-                                        style={{
-                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                            padding: 16,
-                                            borderRadius: 12,
-                                            borderWidth: 1,
-                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                            opacity: 0.6,
-                                        }}
-                                    >
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                {workout.lift}
-                                            </Text>
-                                            <Badge
-                                                label={workout.day}
-                                                variant="success"
-                                            />
-                                        </View>
-                                        <View style={{ marginBottom: 12 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                }}
-                                            >
-                                                Top Set: {workout.topSet}
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                }}
-                                            >
-                                                Weight: {workout.weight}
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: isDark ? COLORS.textTertiaryDark : COLORS.textTertiary
-                                                }}
-                                            >
-                                                {formatDate(workout.date)}
-                                            </Text>
-                                        </View>
-                                        <Text
-                                            style={{
-                                                fontSize: 12,
-                                                color: COLORS.success,
-                                                fontWeight: '500'
-                                            }}
-                                        >
-                                            ✓ Completed
-                                        </Text>
-                                    </View>
-                                ))}
                             </View>
                         )}
                     </Card>
@@ -923,6 +820,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                         {week.lifts.map((lift, liftIndex) => (
                                             <View key={liftIndex} style={{ gap: 4 }}>
                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    {getPassFailIcon(lift.passed)}
                                                     <Text
                                                         style={{
                                                             fontSize: 14,
@@ -932,7 +830,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                     >
                                                         {lift.lift}
                                                     </Text>
-                                                    {getPassFailIcon(lift.passed)}
                                                 </View>
                                                 <View style={{ marginLeft: 8 }}>
                                                     <Text
@@ -942,6 +839,14 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         }}
                                                     >
                                                         Top Set: {lift.topSet} @ {lift.weight}
+                                                    </Text>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                        }}
+                                                    >
+                                                        {lift.scheduledDay} - {formatDate(lift.scheduledDate)}
                                                     </Text>
                                                     {lift.reps !== null && (
                                                         <Text

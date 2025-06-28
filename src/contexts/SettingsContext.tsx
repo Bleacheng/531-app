@@ -114,6 +114,18 @@ interface SettingsContextType {
         trainingMaxPercentage: boolean;
     };
     getOnboardingProgress: () => number;
+    // Cycle Management
+    currentCycle: number;
+    currentWeek: number;
+    setCurrentCycle: (cycle: number) => void;
+    setCurrentWeek: (week: number) => void;
+    startNewCycle: () => void;
+    advanceToNextWeek: () => void;
+    getCurrentCycleData: () => {
+        cycle: number;
+        week: number;
+        isDeloadWeek: boolean;
+    };
 }
 
 const defaultSchedule: WorkoutSchedule = {
@@ -211,6 +223,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const [warmupSets, setWarmupSets] = useState<WarmupSets>(defaultWarmupSets);
     const [scrollPositions, setScrollPositions] = useState<ScrollPositions>(defaultScrollPositions);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentCycle, setCurrentCycle] = useState(1);
+    const [currentWeek, setCurrentWeek] = useState(1);
 
     // Load settings from AsyncStorage on app start
     useEffect(() => {
@@ -219,7 +233,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
@@ -228,6 +242,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
                 AsyncStorage.getItem('settings_workingSetPercentages'),
                 AsyncStorage.getItem('settings_warmupSets'),
                 AsyncStorage.getItem('settings_scrollPositions'),
+                AsyncStorage.getItem('workout_currentCycle'),
+                AsyncStorage.getItem('workout_currentWeek'),
             ]);
 
             if (unitData) {
@@ -253,6 +269,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (scrollData) {
                 setScrollPositions(JSON.parse(scrollData));
+            }
+            if (cycleData) {
+                setCurrentCycle(JSON.parse(cycleData));
+            }
+            if (weekData) {
+                setCurrentWeek(JSON.parse(weekData));
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -333,12 +355,18 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     // Save scroll positions
     const saveScrollPositions = async (positions: ScrollPositions) => {
-        try {
-            await AsyncStorage.setItem('settings_scrollPositions', JSON.stringify(positions));
-            setScrollPositions(positions);
-        } catch (error) {
-            console.error('Error saving scroll positions:', error);
-        }
+        setScrollPositions(positions);
+        await AsyncStorage.setItem('settings_scrollPositions', JSON.stringify(positions));
+    };
+
+    const saveCurrentCycle = async (cycle: number) => {
+        setCurrentCycle(cycle);
+        await AsyncStorage.setItem('workout_currentCycle', JSON.stringify(cycle));
+    };
+
+    const saveCurrentWeek = async (week: number) => {
+        setCurrentWeek(week);
+        await AsyncStorage.setItem('workout_currentWeek', JSON.stringify(week));
     };
 
     const toggleUnit = () => {
@@ -496,12 +524,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             percentage: 90,
         };
 
-        // Save all default values
+        // Save all default values and start first cycle
         await Promise.all([
             saveWorkoutSchedule(defaultSchedule),
             saveExerciseProgression(defaultProgression),
             saveOneRepMax(defaultOneRepMax),
             saveTrainingMaxPercentage(defaultTrainingMaxPercentage),
+            saveCurrentCycle(1),
+            saveCurrentWeek(1),
         ]);
     };
 
@@ -536,6 +566,37 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         const totalItems = 4; // workoutSchedule, exerciseProgression, oneRepMax, trainingMaxPercentage
         const completedItems = totalItems - Object.values(missingItems).filter(Boolean).length;
         return Math.round((completedItems / totalItems) * 100);
+    };
+
+    const startNewCycle = async () => {
+        const newCycle = currentCycle + 1;
+        await Promise.all([
+            saveCurrentCycle(newCycle),
+            saveCurrentWeek(1)
+        ]);
+    };
+
+    const advanceToNextWeek = async () => {
+        if (currentWeek === 4) {
+            // Week 4 completed, start new cycle
+            await startNewCycle();
+        } else {
+            // Move to next week
+            await saveCurrentWeek(currentWeek + 1);
+        }
+    };
+
+    const getCurrentCycleData = (): {
+        cycle: number;
+        week: number;
+        isDeloadWeek: boolean;
+    } => {
+        const isDeloadWeek = currentWeek === 4;
+        return {
+            cycle: currentCycle,
+            week: currentWeek,
+            isDeloadWeek,
+        };
     };
 
     const value = {
@@ -573,6 +634,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         completeOnboarding,
         getMissingOnboardingItems,
         getOnboardingProgress,
+        // Cycle Management
+        currentCycle,
+        currentWeek,
+        setCurrentCycle: saveCurrentCycle,
+        setCurrentWeek: saveCurrentWeek,
+        startNewCycle,
+        advanceToNextWeek,
+        getCurrentCycleData,
     };
 
     return (
