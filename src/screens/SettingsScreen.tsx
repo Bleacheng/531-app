@@ -414,6 +414,12 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
+                backdropTransitionInTiming={200}
+                backdropTransitionOutTiming={200}
             >
                 <View
                     style={{
@@ -423,10 +429,10 @@ export const SettingsScreen: React.FC = () => {
                         width: '100%',
                         maxWidth: 400,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
-                        elevation: 10,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        elevation: 8,
                     }}
                 >
                     {/* Header */}
@@ -546,6 +552,12 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
+                backdropTransitionInTiming={200}
+                backdropTransitionOutTiming={200}
             >
                 <View
                     style={{
@@ -555,10 +567,10 @@ export const SettingsScreen: React.FC = () => {
                         width: '100%',
                         maxWidth: 400,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
-                        elevation: 10,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        elevation: 8,
                     }}
                 >
                     {/* Header */}
@@ -731,6 +743,12 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
+                backdropTransitionInTiming={200}
+                backdropTransitionOutTiming={200}
             >
                 <View
                     style={{
@@ -740,10 +758,10 @@ export const SettingsScreen: React.FC = () => {
                         width: '100%',
                         maxWidth: 400,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
-                        elevation: 10,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        elevation: 8,
                     }}
                 >
                     {/* Header */}
@@ -916,6 +934,12 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
+                animationIn="fadeIn"
+                animationOut="fadeOut"
+                animationInTiming={200}
+                animationOutTiming={200}
+                backdropTransitionInTiming={200}
+                backdropTransitionOutTiming={200}
             >
                 <View
                     style={{
@@ -925,10 +949,10 @@ export const SettingsScreen: React.FC = () => {
                         width: '100%',
                         maxWidth: 400,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.3,
-                        shadowRadius: 8,
-                        elevation: 10,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.25,
+                        shadowRadius: 4,
+                        elevation: 8,
                     }}
                 >
                     {/* Header */}
