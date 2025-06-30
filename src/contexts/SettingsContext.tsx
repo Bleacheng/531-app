@@ -159,6 +159,10 @@ interface SettingsContextType {
     trainingMaxDecreases: TrainingMaxDecreases;
     decreaseTrainingMax: (exercise: keyof WorkoutSchedule) => void;
     resetTrainingMaxDecreases: (exercise: keyof WorkoutSchedule) => void;
+    // Data Management
+    clearWorkoutHistory: () => void;
+    clearTrainingMaxDecreases: () => void;
+    undoWorkout: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => void;
 }
 
 const defaultSchedule: WorkoutSchedule = {
@@ -783,6 +787,79 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         await saveTrainingMaxDecreases(newTrainingMaxDecreases);
     };
 
+    // Data Management
+    const clearWorkoutHistory = async () => {
+        try {
+            await AsyncStorage.removeItem('workout_history');
+            setWorkoutHistory({ workouts: [] });
+        } catch (error) {
+            console.error('Error clearing workout history:', error);
+        }
+    };
+
+    const clearTrainingMaxDecreases = async () => {
+        try {
+            await AsyncStorage.removeItem('workout_trainingMaxDecreases');
+            setTrainingMaxDecreases({
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            });
+        } catch (error) {
+            console.error('Error clearing training max decreases:', error);
+        }
+    };
+
+    const undoWorkout = async (exercise: keyof WorkoutSchedule, cycle: number, week: number) => {
+        const today = new Date().toISOString().split('T')[0];
+        const workoutKey = `${exercise}_${cycle}_${week}`;
+
+        const existingWorkoutIndex = workoutHistory.workouts.findIndex(
+            w => w.exercise === exercise && w.cycle === cycle && w.week === week
+        );
+
+        if (existingWorkoutIndex >= 0) {
+            // Determine what the status should be based on the scheduled date
+            const completedWorkout = workoutHistory.workouts[existingWorkoutIndex];
+            const scheduledDate = new Date(completedWorkout.scheduledDate);
+            const now = new Date();
+            let status: 'upcoming' | 'today' | 'missed' = 'upcoming';
+            if (scheduledDate.toDateString() === now.toDateString()) {
+                status = 'today';
+            } else if (scheduledDate < now) {
+                status = 'missed';
+            } else {
+                status = 'upcoming';
+            }
+            const restoredWorkout: WorkoutStatus = {
+                exercise,
+                cycle,
+                week,
+                scheduledDate: completedWorkout.scheduledDate,
+                status
+            };
+            let newWorkouts = [...workoutHistory.workouts];
+            newWorkouts[existingWorkoutIndex] = restoredWorkout;
+            if (completedWorkout.status === 'completed') {
+                // Mark the workout as missed
+                await markWorkoutAsMissed(exercise, cycle, week);
+            } else {
+                // Mark the workout as upcoming
+                const upcomingWorkout: WorkoutStatus = {
+                    exercise,
+                    cycle,
+                    week,
+                    scheduledDate: today,
+                    status: 'upcoming'
+                };
+                let newWorkouts = [...workoutHistory.workouts];
+                newWorkouts[existingWorkoutIndex] = upcomingWorkout;
+                await saveWorkoutHistory({ workouts: newWorkouts });
+            }
+        }
+    };
+
     const value = {
         unit,
         setUnit: saveUnit,
@@ -836,6 +913,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         trainingMaxDecreases,
         decreaseTrainingMax,
         resetTrainingMaxDecreases,
+        // Data Management
+        clearWorkoutHistory,
+        clearTrainingMaxDecreases,
+        undoWorkout,
     };
 
     return (

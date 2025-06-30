@@ -38,7 +38,9 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         getWorkoutStatus,
         updateWorkoutStatuses,
         setUnit,
-        trainingMaxDecreases
+        trainingMaxDecreases,
+        resetTrainingMaxDecreases,
+        undoWorkout
     } = useSettings();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
@@ -362,13 +364,15 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
     // Get next occurrence of a day of the week
     const getNextDayOccurrence = (dayName: string, fromDate: Date = new Date()): Date => {
         const dayMap: { [key: string]: number } = {
-            'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
-            'Friday': 5, 'Saturday': 6, 'Sunday': 0
+            'Sunday': 0, 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
+            'Friday': 5, 'Saturday': 6
         };
 
         const targetDay = dayMap[dayName];
         const currentDay = fromDate.getDay();
-        const daysUntilTarget = (targetDay - currentDay + 7) % 7;
+        let daysUntilTarget = (targetDay - currentDay + 7) % 7;
+        // If today is the target day, set daysUntilTarget to 1 (next week)
+        if (daysUntilTarget === 0) daysUntilTarget = 7;
 
         const nextDate = new Date(fromDate);
         nextDate.setDate(fromDate.getDate() + daysUntilTarget);
@@ -377,6 +381,9 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
     // Memoize today's date to prevent recalculation on every render
     const today = useMemo(() => new Date(), []);
+
+    // Week names for display
+    const weekNames = ['5/5/5+', '3/3/3+', '5/3/1+', 'Deload'];
 
     // Update workout statuses when component mounts or workout history changes
     useEffect(() => {
@@ -400,7 +407,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                 week < currentWeek ? 'completed' :
                     week === currentWeek ? 'current' : 'upcoming';
 
-            const weekNames = ['5/5/5+', '3/3/3+', '5/3/1+', 'Deload'];
             const weekDescriptions = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
 
             // Calculate week start date based on first workout day
@@ -477,7 +483,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
             const nextCycle = currentCycle + 1;
 
             for (let week = 1; week <= 4; week++) {
-                const weekNames = ['5/5/5+', '3/3/3+', '5/3/1+', 'Deload'];
                 const weekDescriptions = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
 
                 const firstWorkoutDay = Object.values(workoutSchedule).find(day => day !== '');
@@ -1234,15 +1239,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
                                                             }}
                                                         >
-                                                            Top Set: {lift.topSet}
-                                                        </Text>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                            }}
-                                                        >
-                                                            Weight: {lift.weight}
+                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
                                                     </View>
                                                     <Button
@@ -1318,15 +1315,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
                                                             }}
                                                         >
-                                                            Top Set: {lift.topSet}
-                                                        </Text>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                            }}
-                                                        >
-                                                            Weight: {lift.weight}
+                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
                                                     </View>
                                                     <Button
@@ -1363,7 +1352,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         borderRadius: 12,
                                                         borderWidth: 1,
                                                         borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                                                        opacity: 0.8,
                                                     }}
                                                 >
                                                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1403,18 +1391,53 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
                                                             }}
                                                         >
-                                                            Top Set: {lift.topSet} @ {lift.weight}
+                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
                                                     </View>
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 12,
-                                                            color: isDark ? COLORS.error : COLORS.errorDark,
-                                                            fontWeight: '500'
-                                                        }}
+                                                    <Button
+                                                        onPress={() => handleStartWorkout(lift.lift)}
+                                                        variant="primary"
+                                                        fullWidth
                                                     >
-                                                        ✗ Missed
-                                                    </Text>
+                                                        Start Workout
+                                                    </Button>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 12,
+                                                                color: isDark ? COLORS.error : COLORS.errorDark,
+                                                                fontWeight: '500',
+                                                            }}
+                                                        >
+                                                            ✗ Missed
+                                                        </Text>
+                                                        <TouchableOpacity
+                                                            onPress={() => {
+                                                                Alert.alert(
+                                                                    'Undo Missed Workout',
+                                                                    `Are you sure you want to undo the missed ${lift.lift} workout?`,
+                                                                    [
+                                                                        { text: 'Cancel', style: 'cancel' },
+                                                                        {
+                                                                            text: 'Undo',
+                                                                            style: 'destructive',
+                                                                            onPress: () => undoWorkout(lift.exercise, currentCycle, lift.week)
+                                                                        }
+                                                                    ]
+                                                                );
+                                                            }}
+                                                            style={{
+                                                                backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
+                                                                paddingHorizontal: 8,
+                                                                paddingVertical: 4,
+                                                                borderRadius: 4,
+                                                            }}
+                                                        >
+                                                            <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
+                                                                Undo
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    </View>
                                                 </View>
                                             ))}
                                         </View>
@@ -1482,7 +1505,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
                                                             }}
                                                         >
-                                                            Top Set: {lift.topSet} @ {lift.weight}
+                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
                                                         {lift.reps !== null && (
                                                             <Text
@@ -1505,17 +1528,45 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         >
                                                             ✓ Completed
                                                         </Text>
-                                                        {lift.reps !== null && (
-                                                            <Text
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                            {lift.reps !== null && (
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 12,
+                                                                        color: (lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? COLORS.error : COLORS.success,
+                                                                        fontWeight: '500'
+                                                                    }}
+                                                                >
+                                                                    {(lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? '✗ Failed' : '✓ Passed'}
+                                                                </Text>
+                                                            )}
+                                                            <TouchableOpacity
+                                                                onPress={() => {
+                                                                    Alert.alert(
+                                                                        'Undo Workout',
+                                                                        `Are you sure you want to undo the ${lift.lift} workout?`,
+                                                                        [
+                                                                            { text: 'Cancel', style: 'cancel' },
+                                                                            {
+                                                                                text: 'Undo',
+                                                                                style: 'destructive',
+                                                                                onPress: () => undoWorkout(lift.exercise, currentCycle, lift.week)
+                                                                            }
+                                                                        ]
+                                                                    );
+                                                                }}
                                                                 style={{
-                                                                    fontSize: 12,
-                                                                    color: (lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? COLORS.error : COLORS.success,
-                                                                    fontWeight: '500'
+                                                                    backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
+                                                                    paddingHorizontal: 8,
+                                                                    paddingVertical: 4,
+                                                                    borderRadius: 4,
                                                                 }}
                                                             >
-                                                                {(lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? '✗ Failed' : '✓ Passed'}
-                                                            </Text>
-                                                        )}
+                                                                <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
+                                                                    Undo
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        </View>
                                                     </View>
                                                 </View>
                                             ))}
@@ -1552,6 +1603,146 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                 </View>
                             );
                         })}
+                    </Card>
+                )}
+
+                {/* Cycle Overview - Only show when onboarding is complete */}
+                {!isOnboardingNeeded() && (
+                    <Card
+                        title="Cycle Overview"
+                        borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                            <BarChart3 size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 16
+                                }}
+                            >
+                                Cycle {currentCycle} Progress
+                            </Text>
+                        </View>
+
+                        <View style={{ gap: 12 }}>
+                            {cycleOverview.map((week, weekIndex) => (
+                                <View
+                                    key={weekIndex}
+                                    style={{
+                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                        padding: 16,
+                                        borderRadius: 12,
+                                        borderWidth: 1,
+                                        borderColor: getStatusColor(week.status),
+                                    }}
+                                >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                        {getStatusIcon(week.status)}
+                                        <Text
+                                            style={{
+                                                fontSize: 16,
+                                                fontWeight: '600',
+                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                marginLeft: 8,
+                                                flex: 1
+                                            }}
+                                        >
+                                            {weekNames[week.week - 1]}
+                                        </Text>
+                                        <Badge
+                                            label={week.description}
+                                            variant={week.status === 'completed' ? 'success' : week.status === 'current' ? 'primary' : 'complementary'}
+                                        />
+                                    </View>
+
+                                    <View style={{ gap: 8 }}>
+                                        {week.lifts.map((lift, liftIndex) => {
+                                            // Get workout status for this specific exercise
+                                            const workoutStatus = getWorkoutStatus(lift.exercise, currentCycle, lift.week);
+                                            let exerciseStatus: 'upcoming' | 'completed' | 'failed' = 'upcoming';
+
+                                            if (workoutStatus && workoutStatus.status === 'completed' && workoutStatus.reps) {
+                                                // Check if failed based on reps
+                                                const isFailed = lift.week === 4 ? workoutStatus.reps < 3 : workoutStatus.reps < 5;
+                                                exerciseStatus = isFailed ? 'failed' : 'completed';
+                                            }
+
+                                            return (
+                                                <View
+                                                    key={liftIndex}
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        paddingVertical: 4,
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            flex: 1
+                                                        }}
+                                                    >
+                                                        {lift.lift}
+                                                    </Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                        {exerciseStatus === 'completed' && (
+                                                            <CheckCircle size={12} color={COLORS.success} />
+                                                        )}
+                                                        {exerciseStatus === 'failed' && (
+                                                            <X size={12} color={COLORS.error} />
+                                                        )}
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 14,
+                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                            }}
+                                                        >
+                                                            {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
+                                                        </Text>
+                                                        {workoutStatus && workoutStatus.reps !== null && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 12,
+                                                                    color: exerciseStatus === 'completed' ? COLORS.success : COLORS.error,
+                                                                    fontWeight: '600',
+                                                                }}
+                                                            >
+                                                                {workoutStatus.reps}
+                                                            </Text>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            ))}
+                        </View>
+                    </Card>
+                )}
+
+                {/* Statistics - Only show when onboarding is complete */}
+                {!isOnboardingNeeded() && (
+                    <Card
+                        title="Statistics"
+                        borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                            <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 16
+                                }}
+                            >
+                                1RM Progress
+                            </Text>
+                        </View>
+
+                        <OneRMGraph data={oneRMData} unit={unit} />
                     </Card>
                 )}
             </ScrollView>

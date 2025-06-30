@@ -42,7 +42,9 @@ export const SettingsScreen: React.FC = () => {
         setWarmupSets,
         trainingMaxDecreases,
         decreaseTrainingMax,
-        resetTrainingMaxDecreases
+        resetTrainingMaxDecreases,
+        clearWorkoutHistory,
+        clearTrainingMaxDecreases
     } = useSettings();
     const isDark = theme === 'dark';
 
@@ -253,99 +255,111 @@ export const SettingsScreen: React.FC = () => {
         setResetDataModalVisible(true);
     };
 
-    const confirmResetSettings = () => {
-        // Reset theme to light
-        setTheme('light');
+    const confirmResetSettings = async () => {
+        try {
+            // Reset theme to light
+            setTheme('light');
 
-        // Reset unit to kg
-        setUnit('kg');
+            // Reset unit to kg
+            setUnit('kg');
 
-        // Reset workout schedule to empty values to force onboarding
-        const emptySchedule = {
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        };
-        setWorkoutSchedule(emptySchedule);
+            // Clear workout history and training max decreases
+            await Promise.all([
+                clearWorkoutHistory(),
+                clearTrainingMaxDecreases(),
+            ]);
 
-        // Reset exercise progression to empty values to force onboarding
-        const emptyProgression = {
-            benchPress: 0,
-            squat: 0,
-            deadlift: 0,
-            overheadPress: 0,
-        };
-        setExerciseProgression(emptyProgression);
+            // Reset workout schedule to empty values to force onboarding
+            const emptySchedule = {
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            };
+            setWorkoutSchedule(emptySchedule);
 
-        // Reset 1RM to empty values to force onboarding
-        const emptyOneRepMax = {
-            benchPress: 0,
-            squat: 0,
-            deadlift: 0,
-            overheadPress: 0,
-        };
-        setOneRepMax(emptyOneRepMax);
+            // Reset exercise progression to empty values to force onboarding
+            const emptyProgression = {
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            };
+            setExerciseProgression(emptyProgression);
 
-        // Reset training max percentage to empty values to force onboarding
-        const emptyTrainingMax = {
-            percentage: 0,
-        };
-        setTrainingMaxPercentage(emptyTrainingMax);
+            // Reset 1RM to empty values to force onboarding
+            const emptyOneRepMax = {
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            };
+            setOneRepMax(emptyOneRepMax);
 
-        // Reset warm-up sets to defaults
-        const defaultWarmup = {
-            set1: { percentage: 40, reps: 5 },
-            set2: { percentage: 50, reps: 5 },
-            set3: { percentage: 60, reps: 3 },
-            enabled: true,
-        };
-        setWarmupSets(defaultWarmup);
+            // Reset training max percentage to empty values to force onboarding
+            const emptyTrainingMax = {
+                percentage: 0,
+            };
+            setTrainingMaxPercentage(emptyTrainingMax);
 
-        // Update local state for progression inputs
-        setProgressionInputs({
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        });
+            // Reset warm-up sets to defaults
+            const defaultWarmup = {
+                set1: { percentage: 40, reps: 5 },
+                set2: { percentage: 50, reps: 5 },
+                set3: { percentage: 60, reps: 3 },
+                enabled: true,
+            };
+            setWarmupSets(defaultWarmup);
 
-        // Update local state for 1RM inputs
-        setOneRepMaxInputs({
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        });
+            // Update local state for progression inputs
+            setProgressionInputs({
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            });
 
-        // Update local state for warm-up inputs
-        setWarmupInputs({
-            set1Percentage: defaultWarmup.set1.percentage.toString(),
-            set1Reps: defaultWarmup.set1.reps.toString(),
-            set2Percentage: defaultWarmup.set2.percentage.toString(),
-            set2Reps: defaultWarmup.set2.reps.toString(),
-            set3Percentage: defaultWarmup.set3.percentage.toString(),
-            set3Reps: defaultWarmup.set3.reps.toString(),
-        });
+            // Update local state for 1RM inputs
+            setOneRepMaxInputs({
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            });
 
-        setResetSettingsModalVisible(false);
+            // Update local state for warm-up inputs
+            setWarmupInputs({
+                set1Percentage: defaultWarmup.set1.percentage.toString(),
+                set1Reps: defaultWarmup.set1.reps.toString(),
+                set2Percentage: defaultWarmup.set2.percentage.toString(),
+                set2Reps: defaultWarmup.set2.reps.toString(),
+                set3Percentage: defaultWarmup.set3.percentage.toString(),
+                set3Reps: defaultWarmup.set3.reps.toString(),
+            });
 
-        Alert.alert(
-            'Settings Reset',
-            'All settings have been reset. You will need to complete setup again.',
-            [{ text: 'OK' }]
-        );
+            setResetSettingsModalVisible(false);
+
+            Alert.alert(
+                'Settings Reset',
+                'All settings and workout data have been reset. You will need to complete setup again.',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Error resetting settings:', error);
+            Alert.alert(
+                'Error',
+                'Failed to reset settings. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
     const confirmResetData = async () => {
         try {
-            // Clear all workout-related data from AsyncStorage
+            // Clear workout history and training max decreases using context functions
             await Promise.all([
-                AsyncStorage.removeItem('workout_trainingMaxes'),
-                AsyncStorage.removeItem('workout_personalRecords'),
-                AsyncStorage.removeItem('workout_history'),
-                AsyncStorage.removeItem('workout_currentCycle'),
-                AsyncStorage.removeItem('workout_currentWeek'),
+                clearWorkoutHistory(),
+                clearTrainingMaxDecreases(),
             ]);
 
             // Reset settings to empty values to force onboarding
