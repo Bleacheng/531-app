@@ -8,7 +8,24 @@ import { Badge } from '../components/Badge';
 import { OneRMGraph } from '../components/OneRMGraph';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useWorkoutSession } from '../contexts/WorkoutSessionContext';
 import { COLORS } from '../constants/colors';
+import WorkoutSessionScreen from './WorkoutSessionScreen';
+
+// 1. Define types for exercises and onboarding data
+const exercises = ['benchPress', 'squat', 'overheadPress', 'deadlift'] as const;
+type Exercise = typeof exercises[number];
+
+interface OnboardingData {
+    workoutSchedule: Record<Exercise, string>;
+    exerciseProgression: Record<Exercise, string>;
+    oneRepMax: Record<Exercise, string>;
+    oneRmWeight: Record<Exercise, string>;
+    oneRmReps: Record<Exercise, string>;
+    trainingMaxPercentage: string;
+    bbbVariant: 'none' | 'bbb';
+    bbbPercentage: string;
+}
 
 export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | 'settings') => void }> = ({ onNavigate }) => {
     const { theme } = useTheme();
@@ -43,8 +60,10 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         undoWorkout,
         bbbSettings,
         updateBbbEnabled,
-        updateBbbPercentage
+        updateBbbPercentage,
+        warmupSets
     } = useSettings();
+    const { workoutSession, startWorkout, completeWorkoutSession, discardWorkoutSession } = useWorkoutSession();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
 
@@ -52,20 +71,16 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
     const [onboardingVisible, setOnboardingVisible] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
 
-    // 1. Define types for exercises and onboarding data
-    const exercises = ['benchPress', 'squat', 'overheadPress', 'deadlift'] as const;
-    type Exercise = typeof exercises[number];
+    // Day selector modal state (like in settings)
+    const [daySelectorModalVisible, setDaySelectorModalVisible] = useState(false);
+    const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
 
-    interface OnboardingData {
-        workoutSchedule: Record<Exercise, string>;
-        exerciseProgression: Record<Exercise, string>;
-        oneRepMax: Record<Exercise, string>;
-        oneRmWeight: Record<Exercise, string>;
-        oneRmReps: Record<Exercise, string>;
-        trainingMaxPercentage: string;
-        bbbVariant: 'none' | 'bbb';
-        bbbPercentage: string;
-    }
+    // Add state for onboarding day selector modal
+    const [onboardingDaySelectorModalVisible, setOnboardingDaySelectorModalVisible] = useState(false);
+    const [onboardingSelectedExercise, setOnboardingSelectedExercise] = useState<Exercise | null>(null);
+
+    // Add local onboarding unit state
+    const [onboardingUnit, setOnboardingUnit] = useState<'kg' | 'lbs'>(unit || 'kg');
 
     // 2. Update onboardingData state to use new structure
     const [onboardingData, setOnboardingData] = useState<OnboardingData>({
@@ -79,17 +94,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         bbbPercentage: '50',
     });
 
-    // Day selector modal state (like in settings)
-    const [daySelectorModalVisible, setDaySelectorModalVisible] = useState(false);
-    const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
-
-    // Add state for onboarding day selector modal
-    const [onboardingDaySelectorModalVisible, setOnboardingDaySelectorModalVisible] = useState(false);
-    const [onboardingSelectedExercise, setOnboardingSelectedExercise] = useState<Exercise | null>(null);
-
-    // Add local onboarding unit state
-    const [onboardingUnit, setOnboardingUnit] = useState<'kg' | 'lbs'>(unit || 'kg');
-
     // Restore scroll position when component mounts
     useEffect(() => {
         const savedPosition = getScrollPosition('home');
@@ -99,22 +103,73 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
     }, []);
 
     const handleStartWorkout = (exercise: string) => {
-        // For now, we'll simulate completing the workout
-        // In a real app, this would open a workout tracking screen
         const exerciseKey = Object.keys(exerciseNames).find(key => exerciseNames[key as keyof typeof exerciseNames] === exercise) as keyof typeof workoutSchedule;
 
         if (exerciseKey) {
-            // Simulate completing the workout with random reps (5-10)
-            const reps = Math.floor(Math.random() * 6) + 5;
-            const weight = calculateWorkoutWeight(exerciseKey, currentWeek, 3);
+            // Generate workout sets
+            const sets = [];
 
-            completeWorkout(exerciseKey, currentCycle, currentWeek, reps, formatWeight(weight));
+            // Add warmup sets if enabled
+            if (warmupSets.enabled && currentWeek !== 4) { // No warmups in deload week
+                if (warmupSets.set1.percentage > 0) {
+                    const weight = roundToNearest2_5((calculateTrainingMax(exerciseKey as keyof typeof oneRepMax, currentCycle) * warmupSets.set1.percentage) / 100);
+                    sets.push({
+                        weight: formatWeight(weight),
+                        reps: warmupSets.set1.reps,
+                        amrap: false
+                    });
+                }
+                if (warmupSets.set2.percentage > 0) {
+                    const weight = roundToNearest2_5((calculateTrainingMax(exerciseKey as keyof typeof oneRepMax, currentCycle) * warmupSets.set2.percentage) / 100);
+                    sets.push({
+                        weight: formatWeight(weight),
+                        reps: warmupSets.set2.reps,
+                        amrap: false
+                    });
+                }
+                if (warmupSets.set3.percentage > 0) {
+                    const weight = roundToNearest2_5((calculateTrainingMax(exerciseKey as keyof typeof oneRepMax, currentCycle) * warmupSets.set3.percentage) / 100);
+                    sets.push({
+                        weight: formatWeight(weight),
+                        reps: warmupSets.set3.reps,
+                        amrap: false
+                    });
+                }
+            }
 
-            Alert.alert(
-                'Workout Completed!',
-                `${exercise} completed with ${reps} reps at ${formatWeight(weight)}`,
-                [{ text: 'OK' }]
-            );
+            // Add working sets
+            const weekKey = `week${currentWeek}` as keyof typeof workingSetPercentages;
+            for (let set = 1; set <= 3; set++) {
+                const setKey = `set${set}` as keyof typeof workingSetPercentages[typeof weekKey];
+                const percentage = workingSetPercentages[weekKey][setKey];
+                const weight = calculateWorkoutWeight(exerciseKey as keyof typeof oneRepMax, currentWeek, set as 1 | 2 | 3);
+                const isAmrap = set === 3 && currentWeek !== 4; // Last set is AMRAP except in deload week
+
+                sets.push({
+                    weight: formatWeight(weight),
+                    reps: isAmrap ? 5 : 5, // Will show as 5+ for AMRAP
+                    amrap: isAmrap
+                });
+            }
+
+            // Add BBB sets if enabled
+            if (bbbSettings.enabled && bbbSettings.percentage > 0 && currentWeek !== 4) {
+                const bbbWeight = calculateBBBWeight(exerciseKey as keyof typeof oneRepMax);
+                for (let i = 0; i < 5; i++) { // 5 sets of 10
+                    sets.push({
+                        weight: formatWeight(bbbWeight),
+                        reps: 10,
+                        amrap: false
+                    });
+                }
+            }
+
+            startWorkout({
+                exercise: exercise,
+                exerciseKey: exerciseKey,
+                week: currentWeek,
+                sets: sets
+            });
         }
     };
 
@@ -351,8 +406,14 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
         const targetDay = dayMap[dayName];
         const currentDay = fromDate.getDay();
+
+        // If today is the target day, return today
+        if (targetDay === currentDay) {
+            return new Date(fromDate);
+        }
+
         let daysUntilTarget = (targetDay - currentDay + 7) % 7;
-        // If today is the target day, set daysUntilTarget to 1 (next week)
+        // If daysUntilTarget is 0, it means we want next week's occurrence
         if (daysUntilTarget === 0) daysUntilTarget = 7;
 
         const nextDate = new Date(fromDate);
@@ -634,1302 +695,1348 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         setOnboardingSelectedExercise(null);
     };
 
+    const handleWorkoutComplete = (setStates: Array<{ status: string | null; repsCompleted: string }>) => {
+        if (workoutSession.exerciseKey) {
+            // Find the AMRAP set (last working set) and get the reps
+            const amrapSetIndex = workoutSession.sets.findIndex(set => set.amrap);
+            let reps = 0;
+
+            if (amrapSetIndex !== -1 && setStates[amrapSetIndex]?.status === 'success') {
+                reps = parseInt(setStates[amrapSetIndex].repsCompleted) || 0;
+            }
+
+            // Check if the workout was successful (AMRAP set completed with sufficient reps)
+            const isSuccessful = reps > 0 && (currentWeek === 4 ? reps >= 3 : reps >= 5);
+
+            if (isSuccessful) {
+                const weight = calculateWorkoutWeight(workoutSession.exerciseKey as keyof typeof oneRepMax, currentWeek, 3);
+                completeWorkout(workoutSession.exerciseKey as keyof typeof oneRepMax, currentCycle, currentWeek, reps, formatWeight(weight));
+            } else {
+                // Mark as missed if AMRAP set failed
+                markWorkoutAsMissed(workoutSession.exerciseKey as keyof typeof oneRepMax, currentCycle, currentWeek);
+            }
+
+            // Close workout session
+            discardWorkoutSession();
+            completeWorkoutSession(setStates);
+        }
+    };
+
+    const handleWorkoutDiscard = () => {
+        discardWorkoutSession();
+    };
+
     return (
         <>
-            <Modal
-                isVisible={onboardingVisible}
-                onBackdropPress={() => setOnboardingVisible(false)}
-                style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
-                backdropOpacity={0.5}
-                useNativeDriver={true}
-                hideModalContentWhileAnimating={true}
-                statusBarTranslucent={true}
-            >
-                <View style={{
-                    backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
-                    borderRadius: 12,
-                    padding: 20,
-                    width: Platform.OS === 'web' ? 400 : '100%',
-                    maxWidth: 400,
-                    maxHeight: Dimensions.get('window').height * 0.8,
-                    minHeight: 500
-                }}>
-                    <ScrollView
-                        style={{ flex: 1 }}
-                        showsVerticalScrollIndicator={true}
-                        contentContainerStyle={{ paddingBottom: 20 }}
+            {workoutSession.visible ? (
+                <WorkoutSessionScreen
+                    exerciseName={workoutSession.exercise || ''}
+                    sets={workoutSession.sets}
+                    week={workoutSession.week || 1}
+                    cycle={currentCycle}
+                    weekName={weekNames[(workoutSession.week || 1) - 1]}
+                    onComplete={handleWorkoutComplete}
+                    onDiscard={handleWorkoutDiscard}
+                    onNavigate={onNavigate}
+                />
+            ) : (
+                <>
+                    <Modal
+                        isVisible={onboardingVisible}
+                        onBackdropPress={() => setOnboardingVisible(false)}
+                        style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
+                        backdropOpacity={0.5}
+                        useNativeDriver={true}
+                        hideModalContentWhileAnimating={true}
+                        statusBarTranslucent={true}
                     >
-                        {/* Step Indicator */}
-                        <Text style={{ fontSize: 16, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
-                            Step {currentStep + 1} of {totalSteps}
-                        </Text>
-                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
-                            {getStepTitle(currentStep)}
-                        </Text>
-                        <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
-                            {getStepDescription(currentStep)}
-                        </Text>
-                        {/* Step Content */}
-                        {currentStep === 0 && (
-                            // Workout Schedule Step with dropdowns
-                            <View style={{ gap: 12 }}>
-                                {exercises.map((exercise) => (
-                                    <View key={exercise} style={{ marginBottom: 8 }}>
-                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
-                                            {exerciseNames[exercise]}
-                                        </Text>
-                                        <TouchableOpacity
-                                            onPress={() => onboardingOpenDaySelector(exercise)}
-                                            style={{
-                                                flexDirection: 'row',
-                                                alignItems: 'center',
-                                                borderWidth: 1,
-                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                borderRadius: 8,
-                                                padding: 12,
-                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                            }}
-                                        >
-                                            <Text style={{ flex: 1, color: isDark ? COLORS.textDark : COLORS.text }}>
-                                                {onboardingData.workoutSchedule[exercise] || 'Select Day'}
-                                            </Text>
-                                            <ChevronDown size={20} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                                        </TouchableOpacity>
-                                    </View>
-                                ))}
-                                {/* Modal for picking a day */}
-                                <Modal
-                                    isVisible={onboardingDaySelectorModalVisible}
-                                    onBackdropPress={() => setOnboardingDaySelectorModalVisible(false)}
-                                    style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
-                                    backdropOpacity={0.5}
-                                    useNativeDriver={true}
-                                    hideModalContentWhileAnimating={true}
-                                    statusBarTranslucent={true}
-                                >
-                                    <View style={{
-                                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
-                                        borderRadius: 12,
-                                        padding: 20,
-                                        width: '100%',
-                                        maxWidth: 400,
-                                        maxHeight: Dimensions.get('window').height * 0.8,
-                                        minHeight: Dimensions.get('window').height * 0.6
-                                    }}>
-                                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
-                                            Select Day
-                                        </Text>
-                                        <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
-                                            Choose which day to perform {onboardingSelectedExercise ? exerciseNames[onboardingSelectedExercise] : ''}
-                                        </Text>
-                                        <ScrollView
-                                            style={{ flex: 1 }}
-                                            showsVerticalScrollIndicator={true}
-                                            contentContainerStyle={{ paddingBottom: 20 }}
-                                        >
-                                            <View style={{ gap: 8 }}>
-                                                {onboardingSelectedExercise && onboardingGetAvailableDays(onboardingSelectedExercise).map(({ day, isCurrent, isUsed }) => (
-                                                    <TouchableOpacity
-                                                        key={day}
-                                                        onPress={() => onboardingHandleDaySelect(onboardingSelectedExercise, day)}
-                                                        style={{
-                                                            backgroundColor: isCurrent
-                                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                                : isUsed
-                                                                    ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
-                                                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                                            borderWidth: 1,
-                                                            borderColor: isCurrent
-                                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                                : isUsed
-                                                                    ? (isDark ? COLORS.error : COLORS.errorDark)
-                                                                    : (isDark ? COLORS.borderDark : COLORS.border),
-                                                            borderRadius: 8,
-                                                            padding: 16,
-                                                            alignItems: 'center',
-                                                            marginBottom: 8,
-                                                        }}
-                                                        activeOpacity={0.8}
-                                                        disabled={isUsed}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 18,
-                                                                fontWeight: '600',
-                                                                color: isCurrent
-                                                                    ? 'white'
-                                                                    : isUsed
-                                                                        ? (isDark ? COLORS.error : COLORS.errorDark)
-                                                                        : (isDark ? COLORS.textDark : COLORS.text),
-                                                            }}
-                                                        >
-                                                            {day}
-                                                        </Text>
-                                                        {isCurrent && (
-                                                            <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
-                                                        )}
-                                                        {isUsed && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 12,
-                                                                    color: isDark ? COLORS.error : COLORS.errorDark,
-                                                                    marginTop: 4,
-                                                                }}
-                                                            >
-                                                                Already used
-                                                            </Text>
-                                                        )}
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </View>
-                                        </ScrollView>
-                                        <TouchableOpacity
-                                            onPress={() => setOnboardingDaySelectorModalVisible(false)}
-                                            style={{
-                                                backgroundColor: 'transparent',
-                                                padding: 16,
-                                                borderRadius: 8,
-                                                alignItems: 'center',
-                                                marginTop: 16,
-                                                borderWidth: 1,
-                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                            }}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: '600' }}>
-                                                Cancel
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </Modal>
-                            </View>
-                        )}
-                        {currentStep === 1 && (
-                            // Exercise Progression Step
-                            <View style={{ gap: 12 }}>
-                                {/* Unit toggle */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-                                    <Button
-                                        variant={onboardingUnit === 'kg' ? 'primary' : 'outline'}
-                                        onPress={() => setOnboardingUnit('kg')}
-                                        style={{ marginRight: 8 }}
-                                    >
-                                        kg
-                                    </Button>
-                                    <Button
-                                        variant={onboardingUnit === 'lbs' ? 'primary' : 'outline'}
-                                        onPress={() => setOnboardingUnit('lbs')}
-                                    >
-                                        lbs
-                                    </Button>
-                                </View>
-                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
-                                    Set the weight increment for each lift (per cycle) in {onboardingUnit}.
+                        <View style={{
+                            backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                            borderRadius: 12,
+                            padding: 20,
+                            width: Platform.OS === 'web' ? 400 : '100%',
+                            maxWidth: 400,
+                            maxHeight: Dimensions.get('window').height * 0.8,
+                            minHeight: 500
+                        }}>
+                            <ScrollView
+                                style={{ flex: 1 }}
+                                showsVerticalScrollIndicator={true}
+                                contentContainerStyle={{ paddingBottom: 20 }}
+                            >
+                                {/* Step Indicator */}
+                                <Text style={{ fontSize: 16, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
+                                    Step {currentStep + 1} of {totalSteps}
                                 </Text>
-                                {exercises.map((exercise) => (
-                                    <View key={exercise} style={{ marginBottom: 8 }}>
-                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
-                                            {exerciseNames[exercise]}
-                                        </Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <TextInput
-                                                style={{
-                                                    flex: 1,
-                                                    borderWidth: 1,
-                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                    borderRadius: 8,
-                                                    padding: 8,
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                }}
-                                                keyboardType="numeric"
-                                                value={onboardingData.exerciseProgression[exercise]}
-                                                onChangeText={(text) => {
-                                                    let sanitized = text.replace(/,/g, '.').replace(/[^0-9.]/g, '');
-                                                    const firstDot = sanitized.indexOf('.');
-                                                    if (firstDot !== -1) {
-                                                        sanitized = sanitized.slice(0, firstDot + 1) + sanitized.slice(firstDot + 1).replace(/\./g, '');
-                                                    }
-                                                    updateOnboardingData('exerciseProgression', exercise, sanitized);
-                                                }}
-                                                placeholder={`e.g. 2.5 or 5`}
-                                            />
-                                            <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
-                                                {onboardingUnit}
-                                            </Text>
-                                        </View>
-                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>
-                                            If you can't see a decimal point, try pasting or using a different keyboard.
-                                        </Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                        {currentStep === 2 && (
-                            // 1RM Calculator Step
-                            <View style={{ gap: 12 }}>
-                                {exercises.map((exercise) => {
-                                    const weight = onboardingData.oneRmWeight[exercise];
-                                    const reps = onboardingData.oneRmReps[exercise];
-                                    // Epley formula
-                                    const calc1RM = weight && reps ? Math.round(parseFloat(weight) * (1 + parseFloat(reps) / 30)) : '';
-                                    return (
-                                        <View key={exercise} style={{ marginBottom: 8 }}>
-                                            <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
-                                                {exerciseNames[exercise]}
-                                            </Text>
-                                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-                                                <TextInput
-                                                    style={{
-                                                        flex: 1,
-                                                        borderWidth: 1,
-                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                        borderRadius: 8,
-                                                        padding: 8,
-                                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                    }}
-                                                    keyboardType="numeric"
-                                                    value={weight}
-                                                    onChangeText={(text) => updateOnboardingData('oneRmWeight', exercise, text.replace(/[^0-9.]/g, ''))}
-                                                    placeholder={`Weight (${onboardingUnit})`}
-                                                />
-                                                <TextInput
-                                                    style={{
-                                                        flex: 1,
-                                                        borderWidth: 1,
-                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                        borderRadius: 8,
-                                                        padding: 8,
-                                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                    }}
-                                                    keyboardType="numeric"
-                                                    value={reps}
-                                                    onChangeText={(text) => updateOnboardingData('oneRmReps', exercise, text.replace(/[^0-9.]/g, ''))}
-                                                    placeholder="Reps"
-                                                />
-                                            </View>
-                                            <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, marginBottom: 4 }}>
-                                                Calculated 1RM: {calc1RM || '--'} {onboardingUnit}
-                                            </Text>
-                                            <TextInput
-                                                style={{
-                                                    borderWidth: 1,
-                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                    borderRadius: 8,
-                                                    padding: 8,
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                }}
-                                                keyboardType="numeric"
-                                                value={onboardingData.oneRepMax[exercise]}
-                                                onChangeText={(text) => updateOnboardingData('oneRepMax', exercise, text.replace(/[^0-9.]/g, ''))}
-                                                placeholder={`Override 1RM (${onboardingUnit})`}
-                                            />
-                                            <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
-                                                You can override the calculated 1RM above if you know your true 1RM.
-                                            </Text>
-                                        </View>
-                                    );
-                                })}
-                            </View>
-                        )}
-                        {currentStep === 3 && (
-                            // Training Max Percentage Step
-                            <View style={{ gap: 12 }}>
-                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
-                                    Training Max Percentage
+                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
+                                    {getStepTitle(currentStep)}
                                 </Text>
-                                <TextInput
-                                    style={{
-                                        borderWidth: 1,
-                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                        borderRadius: 8,
-                                        padding: 8,
-                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                    }}
-                                    keyboardType="numeric"
-                                    value={onboardingData.trainingMaxPercentage}
-                                    onChangeText={(text) => updateOnboardingData('trainingMaxPercentage', '', text.replace(/[^0-9.]/g, ''))}
-                                    placeholder="e.g. 90"
-                                />
-                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
-                                    Enter a value between 80 and 100.
+                                <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+                                    {getStepDescription(currentStep)}
                                 </Text>
-
-                                {/* Training Max Decreases Summary */}
-                                <View style={{ marginTop: 24, padding: 12, backgroundColor: isDark ? COLORS.errorDark + '10' : COLORS.error + '10', borderRadius: 8 }}>
-                                    <Text style={{ fontWeight: '600', color: isDark ? COLORS.error : COLORS.errorDark, marginBottom: 8, fontSize: 16, textAlign: 'center' }}>
-                                        Training Max Decreases
-                                    </Text>
-                                    {exercises.map((exercise) => {
-                                        const decreases = trainingMaxDecreases[exercise];
-                                        const hasDecreases = decreases > 0;
-                                        return (
-                                            <View key={exercise} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                                                <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 15, fontWeight: '500' }}>
+                                {/* Step Content */}
+                                {currentStep === 0 && (
+                                    // Workout Schedule Step with dropdowns
+                                    <View style={{ gap: 12 }}>
+                                        {exercises.map((exercise) => (
+                                            <View key={exercise} style={{ marginBottom: 8 }}>
+                                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
                                                     {exerciseNames[exercise]}
                                                 </Text>
-                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                    <Text style={{ color: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary), fontWeight: '600', fontSize: 14 }}>
-                                                        {hasDecreases ? `-${decreases * 10}%` : 'No decrease'}
-                                                    </Text>
-                                                    <TouchableOpacity
-                                                        onPress={() => resetTrainingMaxDecreases(exercise)}
-                                                        style={{
-                                                            backgroundColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                                            paddingHorizontal: 10,
-                                                            paddingVertical: 4,
-                                                            borderRadius: 6,
-                                                            borderWidth: 1,
-                                                            borderColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.borderDark : COLORS.border),
-                                                            marginLeft: 8,
-                                                        }}
-                                                        disabled={!hasDecreases}
-                                                    >
-                                                        <Text style={{ color: hasDecreases ? 'white' : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary), fontSize: 12, fontWeight: '600' }}>
-                                                            Reset
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                </View>
-                                            </View>
-                                        );
-                                    })}
-                                    <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
-                                        Failed workouts reduce your training max for the next cycle. You can reset decreases here if needed.
-                                    </Text>
-                                </View>
-                            </View>
-                        )}
-                        {currentStep === 4 && (
-                            <View style={{ gap: 12 }}>
-                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
-                                    Assistance Work
-                                </Text>
-                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 14, marginBottom: 12 }}>
-                                    Choose your assistance work variant for the 5/3/1 program.
-                                </Text>
-
-                                {/* Variant Selector */}
-                                <View style={{ marginBottom: 16 }}>
-                                    <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 8 }}>
-                                        Select Variant
-                                    </Text>
-                                    <View style={{ gap: 8 }}>
-                                        <TouchableOpacity
-                                            onPress={() => setOnboardingData(prev => ({ ...prev, bbbVariant: 'none' }))}
-                                            style={{
-                                                backgroundColor: onboardingData.bbbVariant === 'none'
-                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                                borderWidth: 1,
-                                                borderColor: onboardingData.bbbVariant === 'none'
-                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                    : (isDark ? COLORS.borderDark : COLORS.border),
-                                                borderRadius: 8,
-                                                padding: 16,
-                                                alignItems: 'center',
-                                            }}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: '600',
-                                                    color: onboardingData.bbbVariant === 'none'
-                                                        ? 'white'
-                                                        : (isDark ? COLORS.textDark : COLORS.text),
-                                                }}
-                                            >
-                                                Nothing
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: onboardingData.bbbVariant === 'none'
-                                                        ? 'white'
-                                                        : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
-                                                    textAlign: 'center',
-                                                    marginTop: 4,
-                                                }}
-                                            >
-                                                No assistance work
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        <TouchableOpacity
-                                            onPress={() => setOnboardingData(prev => ({ ...prev, bbbVariant: 'bbb' }))}
-                                            style={{
-                                                backgroundColor: onboardingData.bbbVariant === 'bbb'
-                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                                borderWidth: 1,
-                                                borderColor: onboardingData.bbbVariant === 'bbb'
-                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                                    : (isDark ? COLORS.borderDark : COLORS.border),
-                                                borderRadius: 8,
-                                                padding: 16,
-                                                alignItems: 'center',
-                                            }}
-                                            activeOpacity={0.8}
-                                        >
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: '600',
-                                                    color: onboardingData.bbbVariant === 'bbb'
-                                                        ? 'white'
-                                                        : (isDark ? COLORS.textDark : COLORS.text),
-                                                }}
-                                            >
-                                                Big But Boring (BBB)
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 12,
-                                                    color: onboardingData.bbbVariant === 'bbb'
-                                                        ? 'white'
-                                                        : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
-                                                    textAlign: 'center',
-                                                    marginTop: 4,
-                                                }}
-                                            >
-                                                5 sets of 10 reps at % of training max
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-
-                                {/* BBB Percentage Field - Only show when BBB is selected */}
-                                {onboardingData.bbbVariant === 'bbb' && (
-                                    <View style={{ marginBottom: 8 }}>
-                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
-                                            BBB Percentage of Training Max
-                                        </Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                            <TextInput
-                                                style={{
-                                                    flex: 1,
-                                                    borderWidth: 1,
-                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                    borderRadius: 8,
-                                                    padding: 8,
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                }}
-                                                keyboardType="numeric"
-                                                value={onboardingData.bbbPercentage}
-                                                onChangeText={text => setOnboardingData(prev => ({ ...prev, bbbPercentage: text.replace(/[^0-9.]/g, '') }))}
-                                                placeholder="e.g. 50"
-                                            />
-                                            <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
-                                                %
-                                            </Text>
-                                        </View>
-                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
-                                            Enter a value between 0 and 100.
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        )}
-                    </ScrollView>
-                    {/* Step Navigation */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 }}>
-                        <Button onPress={() => setCurrentStep(Math.max(currentStep - 1, 0))} variant="outline" disabled={currentStep === 0} style={{ flex: 1, marginRight: 8 }}>
-                            Back
-                        </Button>
-                        <Button onPress={handleOnboardingNext} variant="primary" style={{ flex: 1, marginLeft: 8 }}>
-                            {currentStep < totalSteps - 1 ? 'Next' : 'Finish'}
-                        </Button>
-                    </View>
-                    <Button onPress={() => setOnboardingVisible(false)} variant="outline" style={{ marginTop: 16 }}>
-                        Cancel
-                    </Button>
-                </View>
-            </Modal>
-            <ScrollView
-                ref={scrollViewRef}
-                style={{
-                    flex: 1,
-                    backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
-                }}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                showsVerticalScrollIndicator={false}
-                onScroll={(event) => {
-                    const offsetY = event.nativeEvent.contentOffset.y;
-                    saveScrollPosition('home', offsetY);
-                }}
-                scrollEventThrottle={16}
-            >
-                {/* Onboarding Button - Show when onboarding is needed */}
-                {isOnboardingNeeded() && (
-                    <Card
-                        title="Complete Setup"
-                        borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
-                    >
-                        <View style={{ alignItems: 'center', padding: 20 }}>
-                            <UserPlus size={48} color={isDark ? COLORS.primary : COLORS.primaryDark} style={{ marginBottom: 16 }} />
-                            <Text
-                                style={{
-                                    fontSize: 18,
-                                    fontWeight: '600',
-                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                    textAlign: 'center',
-                                    marginBottom: 12,
-                                }}
-                            >
-                                Complete Your Setup ({onboardingProgress}%)
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    textAlign: 'center',
-                                    marginBottom: 24,
-                                    lineHeight: 20,
-                                }}
-                            >
-                                To start your 5/3/1 journey, we need to set up your workout schedule, exercise progression, 1 rep max values, and training max percentage.
-                            </Text>
-
-                            {/* Progress indicator */}
-                            <View style={{ width: '100%', marginBottom: 20 }}>
-                                <View style={{
-                                    width: '100%',
-                                    height: 8,
-                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                    borderRadius: 4,
-                                    overflow: 'hidden'
-                                }}>
-                                    <View style={{
-                                        width: `${onboardingProgress}%`,
-                                        height: '100%',
-                                        backgroundColor: isDark ? COLORS.primary : COLORS.primaryDark,
-                                        borderRadius: 4
-                                    }} />
-                                </View>
-                            </View>
-
-                            {/* Missing items */}
-                            <View style={{ width: '100%', marginBottom: 24 }}>
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        fontWeight: '600',
-                                        color: isDark ? COLORS.textDark : COLORS.text,
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    Still needed:
-                                </Text>
-                                <View style={{ gap: 4 }}>
-                                    {missingItems.workoutSchedule && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
-                                                Workout Schedule
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {missingItems.exerciseProgression && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
-                                                Exercise Progression
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {missingItems.oneRepMax && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
-                                                1 Rep Max Values
-                                            </Text>
-                                        </View>
-                                    )}
-                                    {missingItems.trainingMaxPercentage && (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                            <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                                            <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
-                                                Training Max Percentage
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-
-                            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
-                                <Button
-                                    onPress={() => setOnboardingVisible(true)}
-                                    variant="primary"
-                                    style={{ flex: 1 }}
-                                >
-                                    Quick Setup
-                                </Button>
-                                <Button
-                                    onPress={() => {
-                                        onNavigate?.('settings');
-                                    }}
-                                    variant="outline"
-                                    style={{ flex: 1 }}
-                                >
-                                    Go to Settings
-                                </Button>
-                            </View>
-                        </View>
-                    </Card>
-                )}
-
-                {/* Week Plan - Only show when onboarding is complete */}
-                {!isOnboardingNeeded() && (
-                    <Card
-                        title="Week Plan"
-                        borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                            <Calendar size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                            <Text
-                                style={{
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    marginLeft: 8,
-                                    fontSize: 16
-                                }}
-                            >
-                                {currentWeek === 4 ? 'Deload Week' : `Week ${currentWeek}`} - Cycle {currentCycle}
-                            </Text>
-                        </View>
-
-                        {/* Current Week's Workouts */}
-                        {cycleOverview.filter(week => week.status === 'current').map((currentWeek, weekIndex) => {
-                            // Categorize workouts by status
-                            const todaysWorkouts = currentWeek.lifts.filter(lift => lift.status === 'today');
-                            const upcomingWorkouts = currentWeek.lifts.filter(lift => lift.status === 'upcoming');
-                            const completedWorkouts = currentWeek.lifts.filter(lift => lift.status === 'completed');
-                            const missedWorkouts = currentWeek.lifts.filter(lift => lift.status === 'missed');
-
-                            return (
-                                <View key={weekIndex} style={{ gap: 16 }}>
-                                    {/* Today's Workouts */}
-                                    {todaysWorkouts.length > 0 && (
-                                        <View style={{ gap: 12 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    fontWeight: '600',
-                                                    color: isDark ? COLORS.primary : COLORS.primaryDark,
-                                                    marginBottom: 8
-                                                }}
-                                            >
-                                                Today
-                                            </Text>
-                                            {todaysWorkouts.map((lift, liftIndex) => (
-                                                <View
-                                                    key={liftIndex}
-                                                    style={{
-                                                        backgroundColor: isDark ? COLORS.primaryDark + '20' : COLORS.primary + '20',
-                                                        padding: 16,
-                                                        borderRadius: 12,
-                                                        borderWidth: 1,
-                                                        borderColor: isDark ? COLORS.primary : COLORS.primaryDark,
-                                                    }}
-                                                >
-                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 16,
-                                                                color: isDark ? COLORS.textDark : COLORS.text,
-                                                                fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            {lift.lift}
-                                                        </Text>
-                                                        <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
-                                                            variant="primary"
-                                                        />
-                                                    </View>
-                                                    <View style={{ marginBottom: 12 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                                                marginBottom: 4
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
-                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
-                                                                weekday: 'long',
-                                                                year: 'numeric',
-                                                                month: 'long',
-                                                                day: 'numeric'
-                                                            })}
-                                                        </Text>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                            }}
-                                                        >
-                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
-                                                        </Text>
-                                                        {lift.bbbWeight && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 14,
-                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                                }}
-                                                            >
-                                                                BBB: {lift.bbbWeight} × 5 × 10
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                    <Button
-                                                        onPress={() => handleStartWorkout(lift.lift)}
-                                                        variant="primary"
-                                                        fullWidth
-                                                    >
-                                                        Start Workout
-                                                    </Button>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-
-                                    {/* Upcoming Workouts */}
-                                    {upcomingWorkouts.length > 0 && (
-                                        <View style={{ gap: 12 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    fontWeight: '600',
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    marginBottom: 8
-                                                }}
-                                            >
-                                                Upcoming
-                                            </Text>
-                                            {upcomingWorkouts.map((lift, liftIndex) => (
-                                                <View
-                                                    key={liftIndex}
-                                                    style={{
-                                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                                        padding: 16,
-                                                        borderRadius: 12,
-                                                        borderWidth: 1,
-                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                                                    }}
-                                                >
-                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 16,
-                                                                color: isDark ? COLORS.textDark : COLORS.text,
-                                                                fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            {lift.lift}
-                                                        </Text>
-                                                        <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
-                                                            variant="complementary"
-                                                        />
-                                                    </View>
-                                                    <View style={{ marginBottom: 12 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                                                marginBottom: 4
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
-                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
-                                                                weekday: 'long',
-                                                                year: 'numeric',
-                                                                month: 'long',
-                                                                day: 'numeric'
-                                                            })}
-                                                        </Text>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                            }}
-                                                        >
-                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
-                                                        </Text>
-                                                        {lift.bbbWeight && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 14,
-                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                                }}
-                                                            >
-                                                                BBB: {lift.bbbWeight} × 5 × 10
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                    <Button
-                                                        onPress={() => handleStartWorkout(lift.lift)}
-                                                        variant="outline"
-                                                        fullWidth
-                                                    >
-                                                        Start Workout
-                                                    </Button>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-
-                                    {/* Missed Workouts */}
-                                    {missedWorkouts.length > 0 && (
-                                        <View style={{ gap: 12 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    fontWeight: '600',
-                                                    color: isDark ? COLORS.error : COLORS.errorDark,
-                                                    marginBottom: 8
-                                                }}
-                                            >
-                                                Missed
-                                            </Text>
-                                            {missedWorkouts.map((lift, liftIndex) => (
-                                                <View
-                                                    key={liftIndex}
-                                                    style={{
-                                                        backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
-                                                        padding: 16,
-                                                        borderRadius: 12,
-                                                        borderWidth: 1,
-                                                        borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                                                    }}
-                                                >
-                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 16,
-                                                                color: isDark ? COLORS.textDark : COLORS.text,
-                                                                fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            {lift.lift}
-                                                        </Text>
-                                                        <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
-                                                            variant="error"
-                                                        />
-                                                    </View>
-                                                    <View style={{ marginBottom: 12 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                                                marginBottom: 4
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
-                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
-                                                                weekday: 'long',
-                                                                year: 'numeric',
-                                                                month: 'long',
-                                                                day: 'numeric'
-                                                            })}
-                                                        </Text>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                            }}
-                                                        >
-                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
-                                                        </Text>
-                                                        {lift.bbbWeight && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 14,
-                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                                }}
-                                                            >
-                                                                BBB: {lift.bbbWeight} × 5 × 10
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                    <Button
-                                                        onPress={() => handleStartWorkout(lift.lift)}
-                                                        variant="primary"
-                                                        fullWidth
-                                                    >
-                                                        Start Workout
-                                                    </Button>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 12,
-                                                                color: isDark ? COLORS.error : COLORS.errorDark,
-                                                                fontWeight: '500',
-                                                            }}
-                                                        >
-                                                            ✗ Missed
-                                                        </Text>
-                                                        <TouchableOpacity
-                                                            onPress={() => {
-                                                                Alert.alert(
-                                                                    'Undo Missed Workout',
-                                                                    `Are you sure you want to undo the missed ${lift.lift} workout?`,
-                                                                    [
-                                                                        { text: 'Cancel', style: 'cancel' },
-                                                                        {
-                                                                            text: 'Undo',
-                                                                            style: 'destructive',
-                                                                            onPress: () => undoWorkout(lift.exercise, currentCycle, lift.week)
-                                                                        }
-                                                                    ]
-                                                                );
-                                                            }}
-                                                            style={{
-                                                                backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
-                                                                paddingHorizontal: 8,
-                                                                paddingVertical: 4,
-                                                                borderRadius: 4,
-                                                            }}
-                                                        >
-                                                            <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
-                                                                Undo
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-
-                                    {/* Completed Workouts */}
-                                    {completedWorkouts.length > 0 && (
-                                        <View style={{ gap: 12 }}>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    fontWeight: '600',
-                                                    color: COLORS.success,
-                                                    marginBottom: 8
-                                                }}
-                                            >
-                                                Completed
-                                            </Text>
-                                            {completedWorkouts.map((lift, liftIndex) => (
-                                                <View
-                                                    key={liftIndex}
-                                                    style={{
-                                                        backgroundColor: isDark ? COLORS.successDark + '20' : COLORS.success + '20',
-                                                        padding: 16,
-                                                        borderRadius: 12,
-                                                        borderWidth: 1,
-                                                        borderColor: COLORS.success,
-                                                        opacity: 0.8,
-                                                    }}
-                                                >
-                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 16,
-                                                                color: isDark ? COLORS.textDark : COLORS.text,
-                                                                fontWeight: '600'
-                                                            }}
-                                                        >
-                                                            {lift.lift}
-                                                        </Text>
-                                                        <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
-                                                            variant="success"
-                                                        />
-                                                    </View>
-                                                    <View style={{ marginBottom: 12 }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                                                marginBottom: 4
-                                                            }}
-                                                        >
-                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
-                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
-                                                                weekday: 'long',
-                                                                year: 'numeric',
-                                                                month: 'long',
-                                                                day: 'numeric'
-                                                            })}
-                                                        </Text>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                            }}
-                                                        >
-                                                            Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
-                                                        </Text>
-                                                        {lift.bbbWeight && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 14,
-                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                                }}
-                                                            >
-                                                                BBB: {lift.bbbWeight} × 5 × 10
-                                                            </Text>
-                                                        )}
-                                                        {lift.reps !== null && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 14,
-                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                                                }}
-                                                            >
-                                                                Reps: {lift.reps}
-                                                            </Text>
-                                                        )}
-                                                    </View>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 12,
-                                                                color: COLORS.success,
-                                                                fontWeight: '500'
-                                                            }}
-                                                        >
-                                                            ✓ Completed
-                                                        </Text>
-                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                            {lift.reps !== null && (
-                                                                <Text
-                                                                    style={{
-                                                                        fontSize: 12,
-                                                                        color: (lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? COLORS.error : COLORS.success,
-                                                                        fontWeight: '500'
-                                                                    }}
-                                                                >
-                                                                    {(lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? '✗ Failed' : '✓ Passed'}
-                                                                </Text>
-                                                            )}
-                                                            <TouchableOpacity
-                                                                onPress={() => {
-                                                                    Alert.alert(
-                                                                        'Undo Workout',
-                                                                        `Are you sure you want to undo the ${lift.lift} workout?`,
-                                                                        [
-                                                                            { text: 'Cancel', style: 'cancel' },
-                                                                            {
-                                                                                text: 'Undo',
-                                                                                style: 'destructive',
-                                                                                onPress: () => undoWorkout(lift.exercise, currentCycle, lift.week)
-                                                                            }
-                                                                        ]
-                                                                    );
-                                                                }}
-                                                                style={{
-                                                                    backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
-                                                                    paddingHorizontal: 8,
-                                                                    paddingVertical: 4,
-                                                                    borderRadius: 4,
-                                                                }}
-                                                            >
-                                                                <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
-                                                                    Undo
-                                                                </Text>
-                                                            </TouchableOpacity>
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-
-                                    {/* Empty State if no workouts */}
-                                    {todaysWorkouts.length === 0 && upcomingWorkouts.length === 0 && completedWorkouts.length === 0 && missedWorkouts.length === 0 && (
-                                        <View style={{ alignItems: 'center', padding: 20 }}>
-                                            <Calendar size={48} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} style={{ marginBottom: 16 }} />
-                                            <Text
-                                                style={{
-                                                    fontSize: 16,
-                                                    fontWeight: '600',
-                                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                                    textAlign: 'center',
-                                                    marginBottom: 8,
-                                                }}
-                                            >
-                                                No Workouts This Week
-                                            </Text>
-                                            <Text
-                                                style={{
-                                                    fontSize: 14,
-                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                                    textAlign: 'center',
-                                                    lineHeight: 20,
-                                                }}
-                                            >
-                                                Your current week's workouts will appear here.
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            );
-                        })}
-                    </Card>
-                )}
-
-                {/* Cycle Overview - Only show when onboarding is complete */}
-                {!isOnboardingNeeded() && (
-                    <Card
-                        title="Cycle Overview"
-                        borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                            <BarChart3 size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                            <Text
-                                style={{
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    marginLeft: 8,
-                                    fontSize: 16
-                                }}
-                            >
-                                Cycle {currentCycle} Progress
-                            </Text>
-                        </View>
-
-                        <View style={{ gap: 12 }}>
-                            {cycleOverview.map((week, weekIndex) => (
-                                <View
-                                    key={weekIndex}
-                                    style={{
-                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                        padding: 16,
-                                        borderRadius: 12,
-                                        borderWidth: 1,
-                                        borderColor: getStatusColor(week.status),
-                                    }}
-                                >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                                        {getStatusIcon(week.status)}
-                                        <Text
-                                            style={{
-                                                fontSize: 16,
-                                                fontWeight: '600',
-                                                color: isDark ? COLORS.textDark : COLORS.text,
-                                                marginLeft: 8,
-                                                flex: 1
-                                            }}
-                                        >
-                                            {weekNames[week.week - 1]}
-                                        </Text>
-                                        <Badge
-                                            label={week.description}
-                                            variant={week.status === 'completed' ? 'success' : week.status === 'current' ? 'primary' : 'complementary'}
-                                        />
-                                    </View>
-
-                                    <View style={{ gap: 8 }}>
-                                        {week.lifts.map((lift, liftIndex) => {
-                                            // Get workout status for this specific exercise
-                                            const workoutStatus = getWorkoutStatus(lift.exercise, currentCycle, lift.week);
-                                            let exerciseStatus: 'upcoming' | 'completed' | 'failed' = 'upcoming';
-
-                                            if (workoutStatus && workoutStatus.status === 'completed' && workoutStatus.reps) {
-                                                // Check if failed based on reps
-                                                const isFailed = lift.week === 4 ? workoutStatus.reps < 3 : workoutStatus.reps < 5;
-                                                exerciseStatus = isFailed ? 'failed' : 'completed';
-                                            }
-
-                                            return (
-                                                <View
-                                                    key={liftIndex}
+                                                <TouchableOpacity
+                                                    onPress={() => onboardingOpenDaySelector(exercise)}
                                                     style={{
                                                         flexDirection: 'row',
                                                         alignItems: 'center',
-                                                        paddingVertical: 4,
+                                                        borderWidth: 1,
+                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                        borderRadius: 8,
+                                                        padding: 12,
+                                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
                                                     }}
                                                 >
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 14,
-                                                            color: isDark ? COLORS.textDark : COLORS.text,
-                                                            flex: 1
-                                                        }}
-                                                    >
-                                                        {lift.lift}
+                                                    <Text style={{ flex: 1, color: isDark ? COLORS.textDark : COLORS.text }}>
+                                                        {onboardingData.workoutSchedule[exercise] || 'Select Day'}
                                                     </Text>
-                                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                                        {exerciseStatus === 'completed' && (
-                                                            <CheckCircle size={12} color={COLORS.success} />
-                                                        )}
-                                                        {exerciseStatus === 'failed' && (
-                                                            <X size={12} color={COLORS.error} />
-                                                        )}
-                                                        <Text
-                                                            style={{
-                                                                fontSize: 14,
-                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                                            }}
-                                                        >
-                                                            {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
-                                                        </Text>
-                                                        {lift.bbbWeight && (
-                                                            <Text
+                                                    <ChevronDown size={20} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))}
+                                        {/* Modal for picking a day */}
+                                        <Modal
+                                            isVisible={onboardingDaySelectorModalVisible}
+                                            onBackdropPress={() => setOnboardingDaySelectorModalVisible(false)}
+                                            style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
+                                            backdropOpacity={0.5}
+                                            useNativeDriver={true}
+                                            hideModalContentWhileAnimating={true}
+                                            statusBarTranslucent={true}
+                                        >
+                                            <View style={{
+                                                backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                                                borderRadius: 12,
+                                                padding: 20,
+                                                width: '100%',
+                                                maxWidth: 400,
+                                                maxHeight: Dimensions.get('window').height * 0.8,
+                                                minHeight: Dimensions.get('window').height * 0.6
+                                            }}>
+                                                <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
+                                                    Select Day
+                                                </Text>
+                                                <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+                                                    Choose which day to perform {onboardingSelectedExercise ? exerciseNames[onboardingSelectedExercise] : ''}
+                                                </Text>
+                                                <ScrollView
+                                                    style={{ flex: 1 }}
+                                                    showsVerticalScrollIndicator={true}
+                                                    contentContainerStyle={{ paddingBottom: 20 }}
+                                                >
+                                                    <View style={{ gap: 8 }}>
+                                                        {onboardingSelectedExercise && onboardingGetAvailableDays(onboardingSelectedExercise).map(({ day, isCurrent, isUsed }) => (
+                                                            <TouchableOpacity
+                                                                key={day}
+                                                                onPress={() => onboardingHandleDaySelect(onboardingSelectedExercise, day)}
                                                                 style={{
-                                                                    fontSize: 14,
-                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                    backgroundColor: isCurrent
+                                                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                                        : isUsed
+                                                                            ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
+                                                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                                    borderWidth: 1,
+                                                                    borderColor: isCurrent
+                                                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                                        : isUsed
+                                                                            ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                                                    borderRadius: 8,
+                                                                    padding: 16,
+                                                                    alignItems: 'center',
+                                                                    marginBottom: 8,
                                                                 }}
+                                                                activeOpacity={0.8}
+                                                                disabled={isUsed}
                                                             >
-                                                                BBB: {lift.bbbWeight} × 5 × 10
-                                                            </Text>
-                                                        )}
-                                                        {workoutStatus && workoutStatus.reps !== null && (
-                                                            <Text
-                                                                style={{
-                                                                    fontSize: 12,
-                                                                    color: exerciseStatus === 'completed' ? COLORS.success : COLORS.error,
-                                                                    fontWeight: '600',
-                                                                }}
-                                                            >
-                                                                {workoutStatus.reps}
-                                                            </Text>
-                                                        )}
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 18,
+                                                                        fontWeight: '600',
+                                                                        color: isCurrent
+                                                                            ? 'white'
+                                                                            : isUsed
+                                                                                ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                                                    }}
+                                                                >
+                                                                    {day}
+                                                                </Text>
+                                                                {isCurrent && (
+                                                                    <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                                                )}
+                                                                {isUsed && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 12,
+                                                                            color: isDark ? COLORS.error : COLORS.errorDark,
+                                                                            marginTop: 4,
+                                                                        }}
+                                                                    >
+                                                                        Already used
+                                                                    </Text>
+                                                                )}
+                                                            </TouchableOpacity>
+                                                        ))}
                                                     </View>
+                                                </ScrollView>
+                                                <TouchableOpacity
+                                                    onPress={() => setOnboardingDaySelectorModalVisible(false)}
+                                                    style={{
+                                                        backgroundColor: 'transparent',
+                                                        padding: 16,
+                                                        borderRadius: 8,
+                                                        alignItems: 'center',
+                                                        marginTop: 16,
+                                                        borderWidth: 1,
+                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: '600' }}>
+                                                        Cancel
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </Modal>
+                                    </View>
+                                )}
+                                {currentStep === 1 && (
+                                    // Exercise Progression Step
+                                    <View style={{ gap: 12 }}>
+                                        {/* Unit toggle */}
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                                            <Button
+                                                variant={onboardingUnit === 'kg' ? 'primary' : 'outline'}
+                                                onPress={() => setOnboardingUnit('kg')}
+                                                style={{ marginRight: 8 }}
+                                            >
+                                                kg
+                                            </Button>
+                                            <Button
+                                                variant={onboardingUnit === 'lbs' ? 'primary' : 'outline'}
+                                                onPress={() => setOnboardingUnit('lbs')}
+                                            >
+                                                lbs
+                                            </Button>
+                                        </View>
+                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
+                                            Set the weight increment for each lift (per cycle) in {onboardingUnit}.
+                                        </Text>
+                                        {exercises.map((exercise) => (
+                                            <View key={exercise} style={{ marginBottom: 8 }}>
+                                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                                    {exerciseNames[exercise]}
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <TextInput
+                                                        style={{
+                                                            flex: 1,
+                                                            borderWidth: 1,
+                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                            borderRadius: 8,
+                                                            padding: 8,
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                        }}
+                                                        keyboardType="numeric"
+                                                        value={onboardingData.exerciseProgression[exercise]}
+                                                        onChangeText={(text) => {
+                                                            let sanitized = text.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                                                            const firstDot = sanitized.indexOf('.');
+                                                            if (firstDot !== -1) {
+                                                                sanitized = sanitized.slice(0, firstDot + 1) + sanitized.slice(firstDot + 1).replace(/\./g, '');
+                                                            }
+                                                            updateOnboardingData('exerciseProgression', exercise, sanitized);
+                                                        }}
+                                                        placeholder={`e.g. 2.5 or 5`}
+                                                    />
+                                                    <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                        {onboardingUnit}
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                                                    If you can't see a decimal point, try pasting or using a different keyboard.
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+                                {currentStep === 2 && (
+                                    // 1RM Calculator Step
+                                    <View style={{ gap: 12 }}>
+                                        {exercises.map((exercise) => {
+                                            const weight = onboardingData.oneRmWeight[exercise];
+                                            const reps = onboardingData.oneRmReps[exercise];
+                                            // Epley formula
+                                            const calc1RM = weight && reps ? Math.round(parseFloat(weight) * (1 + parseFloat(reps) / 30)) : '';
+                                            return (
+                                                <View key={exercise} style={{ marginBottom: 8 }}>
+                                                    <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                                        {exerciseNames[exercise]}
+                                                    </Text>
+                                                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                                                        <TextInput
+                                                            style={{
+                                                                flex: 1,
+                                                                borderWidth: 1,
+                                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                                borderRadius: 8,
+                                                                padding: 8,
+                                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                            }}
+                                                            keyboardType="numeric"
+                                                            value={weight}
+                                                            onChangeText={(text) => updateOnboardingData('oneRmWeight', exercise, text.replace(/[^0-9.]/g, ''))}
+                                                            placeholder={`Weight (${onboardingUnit})`}
+                                                        />
+                                                        <TextInput
+                                                            style={{
+                                                                flex: 1,
+                                                                borderWidth: 1,
+                                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                                borderRadius: 8,
+                                                                padding: 8,
+                                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                            }}
+                                                            keyboardType="numeric"
+                                                            value={reps}
+                                                            onChangeText={(text) => updateOnboardingData('oneRmReps', exercise, text.replace(/[^0-9.]/g, ''))}
+                                                            placeholder="Reps"
+                                                        />
+                                                    </View>
+                                                    <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, marginBottom: 4 }}>
+                                                        Calculated 1RM: {calc1RM || '--'} {onboardingUnit}
+                                                    </Text>
+                                                    <TextInput
+                                                        style={{
+                                                            borderWidth: 1,
+                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                            borderRadius: 8,
+                                                            padding: 8,
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                        }}
+                                                        keyboardType="numeric"
+                                                        value={onboardingData.oneRepMax[exercise]}
+                                                        onChangeText={(text) => updateOnboardingData('oneRepMax', exercise, text.replace(/[^0-9.]/g, ''))}
+                                                        placeholder={`Override 1RM (${onboardingUnit})`}
+                                                    />
+                                                    <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
+                                                        You can override the calculated 1RM above if you know your true 1RM.
+                                                    </Text>
                                                 </View>
                                             );
                                         })}
                                     </View>
-                                </View>
-                            ))}
-                        </View>
-                    </Card>
-                )}
+                                )}
+                                {currentStep === 3 && (
+                                    // Training Max Percentage Step
+                                    <View style={{ gap: 12 }}>
+                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                            Training Max Percentage
+                                        </Text>
+                                        <TextInput
+                                            style={{
+                                                borderWidth: 1,
+                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                borderRadius: 8,
+                                                padding: 8,
+                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                            }}
+                                            keyboardType="numeric"
+                                            value={onboardingData.trainingMaxPercentage}
+                                            onChangeText={(text) => updateOnboardingData('trainingMaxPercentage', '', text.replace(/[^0-9.]/g, ''))}
+                                            placeholder="e.g. 90"
+                                        />
+                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
+                                            Enter a value between 80 and 100.
+                                        </Text>
 
-                {/* Statistics - Only show when onboarding is complete */}
-                {!isOnboardingNeeded() && (
-                    <Card
-                        title="Statistics"
-                        borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
+                                        {/* Training Max Decreases Summary */}
+                                        <View style={{ marginTop: 24, padding: 12, backgroundColor: isDark ? COLORS.errorDark + '10' : COLORS.error + '10', borderRadius: 8 }}>
+                                            <Text style={{ fontWeight: '600', color: isDark ? COLORS.error : COLORS.errorDark, marginBottom: 8, fontSize: 16, textAlign: 'center' }}>
+                                                Training Max Decreases
+                                            </Text>
+                                            {exercises.map((exercise) => {
+                                                const decreases = trainingMaxDecreases[exercise];
+                                                const hasDecreases = decreases > 0;
+                                                return (
+                                                    <View key={exercise} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                                        <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 15, fontWeight: '500' }}>
+                                                            {exerciseNames[exercise]}
+                                                        </Text>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                            <Text style={{ color: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary), fontWeight: '600', fontSize: 14 }}>
+                                                                {hasDecreases ? `-${decreases * 10}%` : 'No decrease'}
+                                                            </Text>
+                                                            <TouchableOpacity
+                                                                onPress={() => resetTrainingMaxDecreases(exercise)}
+                                                                style={{
+                                                                    backgroundColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                                    paddingHorizontal: 10,
+                                                                    paddingVertical: 4,
+                                                                    borderRadius: 6,
+                                                                    borderWidth: 1,
+                                                                    borderColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.borderDark : COLORS.border),
+                                                                    marginLeft: 8,
+                                                                }}
+                                                                disabled={!hasDecreases}
+                                                            >
+                                                                <Text style={{ color: hasDecreases ? 'white' : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary), fontSize: 12, fontWeight: '600' }}>
+                                                                    Reset
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    </View>
+                                                );
+                                            })}
+                                            <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                                                Failed workouts reduce your training max for the next cycle. You can reset decreases here if needed.
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                                {currentStep === 4 && (
+                                    <View style={{ gap: 12 }}>
+                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                            Assistance Work
+                                        </Text>
+                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 14, marginBottom: 12 }}>
+                                            Choose your assistance work variant for the 5/3/1 program.
+                                        </Text>
+
+                                        {/* Variant Selector */}
+                                        <View style={{ marginBottom: 16 }}>
+                                            <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 8 }}>
+                                                Select Variant
+                                            </Text>
+                                            <View style={{ gap: 8 }}>
+                                                <TouchableOpacity
+                                                    onPress={() => setOnboardingData(prev => ({ ...prev, bbbVariant: 'none' }))}
+                                                    style={{
+                                                        backgroundColor: onboardingData.bbbVariant === 'none'
+                                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                        borderWidth: 1,
+                                                        borderColor: onboardingData.bbbVariant === 'none'
+                                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                                        borderRadius: 8,
+                                                        padding: 16,
+                                                        alignItems: 'center',
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 16,
+                                                            fontWeight: '600',
+                                                            color: onboardingData.bbbVariant === 'none'
+                                                                ? 'white'
+                                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                                        }}
+                                                    >
+                                                        Nothing
+                                                    </Text>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: onboardingData.bbbVariant === 'none'
+                                                                ? 'white'
+                                                                : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
+                                                            textAlign: 'center',
+                                                            marginTop: 4,
+                                                        }}
+                                                    >
+                                                        No assistance work
+                                                    </Text>
+                                                </TouchableOpacity>
+
+                                                <TouchableOpacity
+                                                    onPress={() => setOnboardingData(prev => ({ ...prev, bbbVariant: 'bbb' }))}
+                                                    style={{
+                                                        backgroundColor: onboardingData.bbbVariant === 'bbb'
+                                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                        borderWidth: 1,
+                                                        borderColor: onboardingData.bbbVariant === 'bbb'
+                                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                                        borderRadius: 8,
+                                                        padding: 16,
+                                                        alignItems: 'center',
+                                                    }}
+                                                    activeOpacity={0.8}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 16,
+                                                            fontWeight: '600',
+                                                            color: onboardingData.bbbVariant === 'bbb'
+                                                                ? 'white'
+                                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                                        }}
+                                                    >
+                                                        Big But Boring (BBB)
+                                                    </Text>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: onboardingData.bbbVariant === 'bbb'
+                                                                ? 'white'
+                                                                : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
+                                                            textAlign: 'center',
+                                                            marginTop: 4,
+                                                        }}
+                                                    >
+                                                        5 sets of 10 reps at % of training max
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+
+                                        {/* BBB Percentage Field - Only show when BBB is selected */}
+                                        {onboardingData.bbbVariant === 'bbb' && (
+                                            <View style={{ marginBottom: 8 }}>
+                                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                                    BBB Percentage of Training Max
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <TextInput
+                                                        style={{
+                                                            flex: 1,
+                                                            borderWidth: 1,
+                                                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                            borderRadius: 8,
+                                                            padding: 8,
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                        }}
+                                                        keyboardType="numeric"
+                                                        value={onboardingData.bbbPercentage}
+                                                        onChangeText={text => setOnboardingData(prev => ({ ...prev, bbbPercentage: text.replace(/[^0-9.]/g, '') }))}
+                                                        placeholder="e.g. 50"
+                                                    />
+                                                    <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                        %
+                                                    </Text>
+                                                </View>
+                                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
+                                                    Enter a value between 0 and 100.
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+                            </ScrollView>
+                            {/* Step Navigation */}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 }}>
+                                <Button onPress={() => setCurrentStep(Math.max(currentStep - 1, 0))} variant="outline" disabled={currentStep === 0} style={{ flex: 1, marginRight: 8 }}>
+                                    Back
+                                </Button>
+                                <Button onPress={handleOnboardingNext} variant="primary" style={{ flex: 1, marginLeft: 8 }}>
+                                    {currentStep < totalSteps - 1 ? 'Next' : 'Finish'}
+                                </Button>
+                            </View>
+                            <Button onPress={() => setOnboardingVisible(false)} variant="outline" style={{ marginTop: 16 }}>
+                                Cancel
+                            </Button>
+                        </View>
+                    </Modal>
+                    <ScrollView
+                        ref={scrollViewRef}
+                        style={{
+                            flex: 1,
+                            backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                        }}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                        showsVerticalScrollIndicator={false}
+                        onScroll={(event) => {
+                            const offsetY = event.nativeEvent.contentOffset.y;
+                            saveScrollPosition('home', offsetY);
+                        }}
+                        scrollEventThrottle={16}
                     >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                            <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                            <Text
-                                style={{
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    marginLeft: 8,
-                                    fontSize: 16
-                                }}
+                        {/* Onboarding Button - Show when onboarding is needed */}
+                        {isOnboardingNeeded() && (
+                            <Card
+                                title="Complete Setup"
+                                borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
                             >
-                                1RM Progress
-                            </Text>
-                        </View>
+                                <View style={{ alignItems: 'center', padding: 20 }}>
+                                    <UserPlus size={48} color={isDark ? COLORS.primary : COLORS.primaryDark} style={{ marginBottom: 16 }} />
+                                    <Text
+                                        style={{
+                                            fontSize: 18,
+                                            fontWeight: '600',
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                            textAlign: 'center',
+                                            marginBottom: 12,
+                                        }}
+                                    >
+                                        Complete Your Setup ({onboardingProgress}%)
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            fontSize: 14,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            textAlign: 'center',
+                                            marginBottom: 24,
+                                            lineHeight: 20,
+                                        }}
+                                    >
+                                        To start your 5/3/1 journey, we need to set up your workout schedule, exercise progression, 1 rep max values, and training max percentage.
+                                    </Text>
 
-                        <OneRMGraph data={oneRMData} unit={unit} />
-                    </Card>
-                )}
-            </ScrollView>
+                                    {/* Progress indicator */}
+                                    <View style={{ width: '100%', marginBottom: 20 }}>
+                                        <View style={{
+                                            width: '100%',
+                                            height: 8,
+                                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                            borderRadius: 4,
+                                            overflow: 'hidden'
+                                        }}>
+                                            <View style={{
+                                                width: `${onboardingProgress}%`,
+                                                height: '100%',
+                                                backgroundColor: isDark ? COLORS.primary : COLORS.primaryDark,
+                                                borderRadius: 4
+                                            }} />
+                                        </View>
+                                    </View>
+
+                                    {/* Missing items */}
+                                    <View style={{ width: '100%', marginBottom: 24 }}>
+                                        <Text
+                                            style={{
+                                                fontSize: 14,
+                                                fontWeight: '600',
+                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                marginBottom: 8,
+                                            }}
+                                        >
+                                            Still needed:
+                                        </Text>
+                                        <View style={{ gap: 4 }}>
+                                            {missingItems.workoutSchedule && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                                    <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                        Workout Schedule
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            {missingItems.exerciseProgression && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                                    <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                        Exercise Progression
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            {missingItems.oneRepMax && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                                    <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                        1 Rep Max Values
+                                                    </Text>
+                                                </View>
+                                            )}
+                                            {missingItems.trainingMaxPercentage && (
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Circle size={12} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                                    <Text style={{ fontSize: 12, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                        Training Max Percentage
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+                                        <Button
+                                            onPress={() => setOnboardingVisible(true)}
+                                            variant="primary"
+                                            style={{ flex: 1 }}
+                                        >
+                                            Quick Setup
+                                        </Button>
+                                        <Button
+                                            onPress={() => {
+                                                onNavigate?.('settings');
+                                            }}
+                                            variant="outline"
+                                            style={{ flex: 1 }}
+                                        >
+                                            Go to Settings
+                                        </Button>
+                                    </View>
+                                </View>
+                            </Card>
+                        )}
+
+                        {/* Week Plan - Only show when onboarding is complete */}
+                        {!isOnboardingNeeded() && (
+                            <Card
+                                title="Week Plan"
+                                borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                                    <Calendar size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                    <Text
+                                        style={{
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            marginLeft: 8,
+                                            fontSize: 16
+                                        }}
+                                    >
+                                        {currentWeek === 4 ? 'Deload Week' : `Week ${currentWeek}`} - Cycle {currentCycle}
+                                    </Text>
+                                </View>
+
+                                {/* Current Week's Workouts */}
+                                {cycleOverview.filter(week => week.status === 'current').map((currentWeek, weekIndex) => {
+                                    // Categorize workouts by status
+                                    const todaysWorkouts = currentWeek.lifts.filter(lift => lift.status === 'today');
+                                    const upcomingWorkouts = currentWeek.lifts.filter(lift => lift.status === 'upcoming');
+                                    const completedWorkouts = currentWeek.lifts.filter(lift => lift.status === 'completed');
+                                    const missedWorkouts = currentWeek.lifts.filter(lift => lift.status === 'missed');
+
+                                    return (
+                                        <View key={weekIndex} style={{ gap: 16 }}>
+                                            {/* Today's Workouts */}
+                                            {todaysWorkouts.length > 0 && (
+                                                <View style={{ gap: 12 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            fontWeight: '600',
+                                                            color: isDark ? COLORS.primary : COLORS.primaryDark,
+                                                            marginBottom: 8
+                                                        }}
+                                                    >
+                                                        Today
+                                                    </Text>
+                                                    {todaysWorkouts.map((lift, liftIndex) => (
+                                                        <View
+                                                            key={liftIndex}
+                                                            style={{
+                                                                backgroundColor: isDark ? COLORS.primaryDark + '20' : COLORS.primary + '20',
+                                                                padding: 16,
+                                                                borderRadius: 12,
+                                                                borderWidth: 1,
+                                                                borderColor: isDark ? COLORS.primary : COLORS.primaryDark,
+                                                            }}
+                                                        >
+                                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 16,
+                                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                                        fontWeight: '600'
+                                                                    }}
+                                                                >
+                                                                    {lift.lift}
+                                                                </Text>
+                                                                <Badge
+                                                                    label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
+                                                                    variant="primary"
+                                                                />
+                                                            </View>
+                                                            <View style={{ marginBottom: 12 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                        marginBottom: 4
+                                                                    }}
+                                                                >
+                                                                    <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                                    {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                        weekday: 'long',
+                                                                        year: 'numeric',
+                                                                        month: 'long',
+                                                                        day: 'numeric'
+                                                                    })}
+                                                                </Text>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                    }}
+                                                                >
+                                                                    Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
+                                                                </Text>
+                                                                {lift.bbbWeight && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 14,
+                                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                        }}
+                                                                    >
+                                                                        BBB: {lift.bbbWeight} × 5 × 10
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                            <Button
+                                                                onPress={() => handleStartWorkout(lift.lift)}
+                                                                variant="primary"
+                                                                fullWidth
+                                                            >
+                                                                Start Workout
+                                                            </Button>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Upcoming Workouts */}
+                                            {upcomingWorkouts.length > 0 && (
+                                                <View style={{ gap: 12 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            fontWeight: '600',
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            marginBottom: 8
+                                                        }}
+                                                    >
+                                                        Upcoming
+                                                    </Text>
+                                                    {upcomingWorkouts.map((lift, liftIndex) => (
+                                                        <View
+                                                            key={liftIndex}
+                                                            style={{
+                                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                                padding: 16,
+                                                                borderRadius: 12,
+                                                                borderWidth: 1,
+                                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                            }}
+                                                        >
+                                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 16,
+                                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                                        fontWeight: '600'
+                                                                    }}
+                                                                >
+                                                                    {lift.lift}
+                                                                </Text>
+                                                                <Badge
+                                                                    label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
+                                                                    variant="complementary"
+                                                                />
+                                                            </View>
+                                                            <View style={{ marginBottom: 12 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                        marginBottom: 4
+                                                                    }}
+                                                                >
+                                                                    <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                                    {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                        weekday: 'long',
+                                                                        year: 'numeric',
+                                                                        month: 'long',
+                                                                        day: 'numeric'
+                                                                    })}
+                                                                </Text>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                    }}
+                                                                >
+                                                                    Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
+                                                                </Text>
+                                                                {lift.bbbWeight && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 14,
+                                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                        }}
+                                                                    >
+                                                                        BBB: {lift.bbbWeight} × 5 × 10
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                            <Button
+                                                                onPress={() => handleStartWorkout(lift.lift)}
+                                                                variant="outline"
+                                                                fullWidth
+                                                            >
+                                                                Start Workout
+                                                            </Button>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Missed Workouts */}
+                                            {missedWorkouts.length > 0 && (
+                                                <View style={{ gap: 12 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            fontWeight: '600',
+                                                            color: isDark ? COLORS.error : COLORS.errorDark,
+                                                            marginBottom: 8
+                                                        }}
+                                                    >
+                                                        Missed
+                                                    </Text>
+                                                    {missedWorkouts.map((lift, liftIndex) => (
+                                                        <View
+                                                            key={liftIndex}
+                                                            style={{
+                                                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                                                                padding: 16,
+                                                                borderRadius: 12,
+                                                                borderWidth: 1,
+                                                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                                            }}
+                                                        >
+                                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 16,
+                                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                                        fontWeight: '600'
+                                                                    }}
+                                                                >
+                                                                    {lift.lift}
+                                                                </Text>
+                                                                <Badge
+                                                                    label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
+                                                                    variant="error"
+                                                                />
+                                                            </View>
+                                                            <View style={{ marginBottom: 12 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                        marginBottom: 4
+                                                                    }}
+                                                                >
+                                                                    <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                                    {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                        weekday: 'long',
+                                                                        year: 'numeric',
+                                                                        month: 'long',
+                                                                        day: 'numeric'
+                                                                    })}
+                                                                </Text>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                    }}
+                                                                >
+                                                                    Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
+                                                                </Text>
+                                                                {lift.bbbWeight && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 14,
+                                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                        }}
+                                                                    >
+                                                                        BBB: {lift.bbbWeight} × 5 × 10
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                            <Button
+                                                                onPress={() => handleStartWorkout(lift.lift)}
+                                                                variant="primary"
+                                                                fullWidth
+                                                            >
+                                                                Start Workout
+                                                            </Button>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 12,
+                                                                        color: isDark ? COLORS.error : COLORS.errorDark,
+                                                                        fontWeight: '500',
+                                                                    }}
+                                                                >
+                                                                    ✗ Missed
+                                                                </Text>
+                                                                <TouchableOpacity
+                                                                    onPress={() => {
+                                                                        Alert.alert(
+                                                                            'Undo Missed Workout',
+                                                                            `Are you sure you want to undo the missed ${lift.lift} workout?`,
+                                                                            [
+                                                                                { text: 'Cancel', style: 'cancel' },
+                                                                                {
+                                                                                    text: 'Undo',
+                                                                                    style: 'destructive',
+                                                                                    onPress: () => undoWorkout(lift.exercise, currentCycle, lift.week)
+                                                                                }
+                                                                            ]
+                                                                        );
+                                                                    }}
+                                                                    style={{
+                                                                        backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
+                                                                        paddingHorizontal: 8,
+                                                                        paddingVertical: 4,
+                                                                        borderRadius: 4,
+                                                                    }}
+                                                                >
+                                                                    <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
+                                                                        Undo
+                                                                    </Text>
+                                                                </TouchableOpacity>
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Completed Workouts */}
+                                            {completedWorkouts.length > 0 && (
+                                                <View style={{ gap: 12 }}>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            fontWeight: '600',
+                                                            color: COLORS.success,
+                                                            marginBottom: 8
+                                                        }}
+                                                    >
+                                                        Completed
+                                                    </Text>
+                                                    {completedWorkouts.map((lift, liftIndex) => (
+                                                        <View
+                                                            key={liftIndex}
+                                                            style={{
+                                                                backgroundColor: isDark ? COLORS.successDark + '20' : COLORS.success + '20',
+                                                                padding: 16,
+                                                                borderRadius: 12,
+                                                                borderWidth: 1,
+                                                                borderColor: COLORS.success,
+                                                                opacity: 0.8,
+                                                            }}
+                                                        >
+                                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 16,
+                                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                                        fontWeight: '600'
+                                                                    }}
+                                                                >
+                                                                    {lift.lift}
+                                                                </Text>
+                                                                <Badge
+                                                                    label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
+                                                                    variant="success"
+                                                                />
+                                                            </View>
+                                                            <View style={{ marginBottom: 12 }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                        marginBottom: 4
+                                                                    }}
+                                                                >
+                                                                    <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                                    {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                        weekday: 'long',
+                                                                        year: 'numeric',
+                                                                        month: 'long',
+                                                                        day: 'numeric'
+                                                                    })}
+                                                                </Text>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                    }}
+                                                                >
+                                                                    Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
+                                                                </Text>
+                                                                {lift.bbbWeight && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 14,
+                                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                        }}
+                                                                    >
+                                                                        BBB: {lift.bbbWeight} × 5 × 10
+                                                                    </Text>
+                                                                )}
+                                                                {lift.reps !== null && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 14,
+                                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                        }}
+                                                                    >
+                                                                        Reps: {lift.reps}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 12,
+                                                                        color: COLORS.success,
+                                                                        fontWeight: '500'
+                                                                    }}
+                                                                >
+                                                                    ✓ Completed
+                                                                </Text>
+                                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                                    {lift.reps !== null && (
+                                                                        <Text
+                                                                            style={{
+                                                                                fontSize: 12,
+                                                                                color: (lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? COLORS.error : COLORS.success,
+                                                                                fontWeight: '500'
+                                                                            }}
+                                                                        >
+                                                                            {(lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? '✗ Failed' : '✓ Passed'}
+                                                                        </Text>
+                                                                    )}
+                                                                    <TouchableOpacity
+                                                                        onPress={() => {
+                                                                            Alert.alert(
+                                                                                'Undo Workout',
+                                                                                `Are you sure you want to undo the ${lift.lift} workout?`,
+                                                                                [
+                                                                                    { text: 'Cancel', style: 'cancel' },
+                                                                                    {
+                                                                                        text: 'Undo',
+                                                                                        style: 'destructive',
+                                                                                        onPress: () => undoWorkout(lift.exercise, currentCycle, lift.week)
+                                                                                    }
+                                                                                ]
+                                                                            );
+                                                                        }}
+                                                                        style={{
+                                                                            backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
+                                                                            paddingHorizontal: 8,
+                                                                            paddingVertical: 4,
+                                                                            borderRadius: 4,
+                                                                        }}
+                                                                    >
+                                                                        <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
+                                                                            Undo
+                                                                        </Text>
+                                                                    </TouchableOpacity>
+                                                                </View>
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                            {/* Empty State if no workouts */}
+                                            {todaysWorkouts.length === 0 && upcomingWorkouts.length === 0 && completedWorkouts.length === 0 && missedWorkouts.length === 0 && (
+                                                <View style={{ alignItems: 'center', padding: 20 }}>
+                                                    <Calendar size={48} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} style={{ marginBottom: 16 }} />
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 16,
+                                                            fontWeight: '600',
+                                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                                            textAlign: 'center',
+                                                            marginBottom: 8,
+                                                        }}
+                                                    >
+                                                        No Workouts This Week
+                                                    </Text>
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                            textAlign: 'center',
+                                                            lineHeight: 20,
+                                                        }}
+                                                    >
+                                                        Your current week's workouts will appear here.
+                                                    </Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    );
+                                })}
+                            </Card>
+                        )}
+
+                        {/* Cycle Overview - Only show when onboarding is complete */}
+                        {!isOnboardingNeeded() && (
+                            <Card
+                                title="Cycle Overview"
+                                borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                                    <BarChart3 size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                    <Text
+                                        style={{
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            marginLeft: 8,
+                                            fontSize: 16
+                                        }}
+                                    >
+                                        Cycle {currentCycle} Progress
+                                    </Text>
+                                </View>
+
+                                <View style={{ gap: 12 }}>
+                                    {cycleOverview.map((week, weekIndex) => (
+                                        <View
+                                            key={weekIndex}
+                                            style={{
+                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                padding: 16,
+                                                borderRadius: 12,
+                                                borderWidth: 1,
+                                                borderColor: getStatusColor(week.status),
+                                            }}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                                                {getStatusIcon(week.status)}
+                                                <Text
+                                                    style={{
+                                                        fontSize: 16,
+                                                        fontWeight: '600',
+                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                        marginLeft: 8,
+                                                        flex: 1
+                                                    }}
+                                                >
+                                                    {weekNames[week.week - 1]}
+                                                </Text>
+                                                <Badge
+                                                    label={week.description}
+                                                    variant={week.status === 'completed' ? 'success' : week.status === 'current' ? 'primary' : 'complementary'}
+                                                />
+                                            </View>
+
+                                            <View style={{ gap: 8 }}>
+                                                {week.lifts.map((lift, liftIndex) => {
+                                                    // Get workout status for this specific exercise
+                                                    const workoutStatus = getWorkoutStatus(lift.exercise, currentCycle, lift.week);
+                                                    let exerciseStatus: 'upcoming' | 'completed' | 'failed' = 'upcoming';
+
+                                                    if (workoutStatus && workoutStatus.status === 'completed' && workoutStatus.reps) {
+                                                        // Check if failed based on reps
+                                                        const isFailed = lift.week === 4 ? workoutStatus.reps < 3 : workoutStatus.reps < 5;
+                                                        exerciseStatus = isFailed ? 'failed' : 'completed';
+                                                    }
+
+                                                    return (
+                                                        <View
+                                                            key={liftIndex}
+                                                            style={{
+                                                                flexDirection: 'row',
+                                                                alignItems: 'center',
+                                                                paddingVertical: 4,
+                                                            }}
+                                                        >
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                                    flex: 1
+                                                                }}
+                                                            >
+                                                                {lift.lift}
+                                                            </Text>
+                                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                                {exerciseStatus === 'completed' && (
+                                                                    <CheckCircle size={12} color={COLORS.success} />
+                                                                )}
+                                                                {exerciseStatus === 'failed' && (
+                                                                    <X size={12} color={COLORS.error} />
+                                                                )}
+                                                                <Text
+                                                                    style={{
+                                                                        fontSize: 14,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                    }}
+                                                                >
+                                                                    {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
+                                                                </Text>
+                                                                {lift.bbbWeight && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 14,
+                                                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                        }}
+                                                                    >
+                                                                        BBB: {lift.bbbWeight} × 5 × 10
+                                                                    </Text>
+                                                                )}
+                                                                {workoutStatus && workoutStatus.reps !== null && (
+                                                                    <Text
+                                                                        style={{
+                                                                            fontSize: 12,
+                                                                            color: exerciseStatus === 'completed' ? COLORS.success : COLORS.error,
+                                                                            fontWeight: '600',
+                                                                        }}
+                                                                    >
+                                                                        {workoutStatus.reps}
+                                                                    </Text>
+                                                                )}
+                                                            </View>
+                                                        </View>
+                                                    );
+                                                })}
+                                            </View>
+                                        </View>
+                                    ))}
+                                </View>
+                            </Card>
+                        )}
+
+                        {/* Statistics - Only show when onboarding is complete */}
+                        {!isOnboardingNeeded() && (
+                            <Card
+                                title="Statistics"
+                                borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
+                            >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                                    <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                    <Text
+                                        style={{
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            marginLeft: 8,
+                                            fontSize: 16
+                                        }}
+                                    >
+                                        1RM Progress
+                                    </Text>
+                                </View>
+
+                                <OneRMGraph data={oneRMData} unit={unit} />
+                            </Card>
+                        )}
+                    </ScrollView>
+                </>
+            )}
         </>
     );
 };
