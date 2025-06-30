@@ -89,6 +89,14 @@ interface WorkoutHistory {
     workouts: WorkoutStatus[];
 }
 
+// Training max decreases for failed workouts
+interface TrainingMaxDecreases {
+    benchPress: number; // Number of 10% decreases applied
+    squat: number;
+    deadlift: number;
+    overheadPress: number;
+}
+
 interface SettingsContextType {
     unit: Unit;
     setUnit: (unit: Unit) => void;
@@ -147,6 +155,10 @@ interface SettingsContextType {
     markWorkoutAsMissed: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => void;
     getWorkoutStatus: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => WorkoutStatus | null;
     updateWorkoutStatuses: () => void;
+    // Training Max Decreases
+    trainingMaxDecreases: TrainingMaxDecreases;
+    decreaseTrainingMax: (exercise: keyof WorkoutSchedule) => void;
+    resetTrainingMaxDecreases: (exercise: keyof WorkoutSchedule) => void;
 }
 
 const defaultSchedule: WorkoutSchedule = {
@@ -247,6 +259,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     const [currentCycle, setCurrentCycle] = useState(1);
     const [currentWeek, setCurrentWeek] = useState(1);
     const [workoutHistory, setWorkoutHistory] = useState<WorkoutHistory>({ workouts: [] });
+    const [trainingMaxDecreases, setTrainingMaxDecreases] = useState<TrainingMaxDecreases>({
+        benchPress: 0,
+        squat: 0,
+        deadlift: 0,
+        overheadPress: 0,
+    });
 
     // Load settings from AsyncStorage on app start
     useEffect(() => {
@@ -255,7 +273,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData, workoutHistoryData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData, workoutHistoryData, trainingMaxDecreasesData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
@@ -267,6 +285,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
                 AsyncStorage.getItem('workout_currentCycle'),
                 AsyncStorage.getItem('workout_currentWeek'),
                 AsyncStorage.getItem('workout_history'),
+                AsyncStorage.getItem('workout_trainingMaxDecreases'),
             ]);
 
             if (unitData) {
@@ -301,6 +320,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (workoutHistoryData) {
                 setWorkoutHistory(JSON.parse(workoutHistoryData));
+            }
+            if (trainingMaxDecreasesData) {
+                setTrainingMaxDecreases(JSON.parse(trainingMaxDecreasesData));
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -635,6 +657,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
     };
 
+    // Save training max decreases
+    const saveTrainingMaxDecreases = async (decreases: TrainingMaxDecreases) => {
+        try {
+            await AsyncStorage.setItem('workout_trainingMaxDecreases', JSON.stringify(decreases));
+            setTrainingMaxDecreases(decreases);
+        } catch (error) {
+            console.error('Error saving training max decreases:', error);
+        }
+    };
+
     // Complete a workout
     const completeWorkout = async (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string) => {
         const today = new Date().toISOString().split('T')[0];
@@ -643,6 +675,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         const existingWorkoutIndex = workoutHistory.workouts.findIndex(
             w => w.exercise === exercise && w.cycle === cycle && w.week === week
         );
+
+        // Check if workout is failed (less than 5 reps on final set for weeks 1-3, or less than 3 reps for deload week)
+        const isFailed = week === 4 ? reps < 3 : reps < 5;
 
         const completedWorkout: WorkoutStatus = {
             exercise,
@@ -663,6 +698,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
 
         await saveWorkoutHistory({ workouts: newWorkouts });
+
+        // If workout is failed, decrease training max by 10% for the next cycle
+        if (isFailed) {
+            const newTrainingMaxDecreases = {
+                ...trainingMaxDecreases,
+                [exercise]: trainingMaxDecreases[exercise] + 1
+            };
+            await saveTrainingMaxDecreases(newTrainingMaxDecreases);
+        }
     };
 
     // Mark a workout as missed
@@ -722,6 +766,23 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
     };
 
+    // Training Max Decreases
+    const decreaseTrainingMax = async (exercise: keyof WorkoutSchedule) => {
+        const newTrainingMaxDecreases = {
+            ...trainingMaxDecreases,
+            [exercise]: trainingMaxDecreases[exercise] + 1
+        };
+        await saveTrainingMaxDecreases(newTrainingMaxDecreases);
+    };
+
+    const resetTrainingMaxDecreases = async (exercise: keyof WorkoutSchedule) => {
+        const newTrainingMaxDecreases = {
+            ...trainingMaxDecreases,
+            [exercise]: 0
+        };
+        await saveTrainingMaxDecreases(newTrainingMaxDecreases);
+    };
+
     const value = {
         unit,
         setUnit: saveUnit,
@@ -771,6 +832,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         markWorkoutAsMissed,
         getWorkoutStatus,
         updateWorkoutStatuses,
+        // Training Max Decreases
+        trainingMaxDecreases,
+        decreaseTrainingMax,
+        resetTrainingMaxDecreases,
     };
 
     return (

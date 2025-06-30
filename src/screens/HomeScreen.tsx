@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, TextInput, Alert, Platform, Dimensions } from 'react-native';
 import { Calendar, CheckCircle, Circle, TrendingUp, X, ArrowRight, ArrowLeft, Settings, UserPlus, ChevronDown, BarChart3 } from 'lucide-react-native';
 import Modal from 'react-native-modal';
 import { Card } from '../components/Card';
@@ -21,7 +21,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         saveScrollPosition,
         getScrollPosition,
         isOnboardingNeeded,
-        completeOnboarding,
         updateWorkoutDay,
         updateExerciseProgression,
         updateOneRepMax,
@@ -37,7 +36,9 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         completeWorkout,
         markWorkoutAsMissed,
         getWorkoutStatus,
-        updateWorkoutStatuses
+        updateWorkoutStatuses,
+        setUnit,
+        trainingMaxDecreases
     } = useSettings();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
@@ -45,31 +46,40 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
     // Onboarding state
     const [onboardingVisible, setOnboardingVisible] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
-    const [onboardingData, setOnboardingData] = useState({
-        workoutSchedule: {
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        },
-        exerciseProgression: {
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        },
-        oneRepMax: {
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        },
-        trainingMaxPercentage: '90'
+
+    // 1. Define types for exercises and onboarding data
+    const exercises = ['benchPress', 'squat', 'overheadPress', 'deadlift'] as const;
+    type Exercise = typeof exercises[number];
+
+    interface OnboardingData {
+        workoutSchedule: Record<Exercise, string>;
+        exerciseProgression: Record<Exercise, string>;
+        oneRepMax: Record<Exercise, string>;
+        oneRmWeight: Record<Exercise, string>;
+        oneRmReps: Record<Exercise, string>;
+        trainingMaxPercentage: string;
+    }
+
+    // 2. Update onboardingData state to use new structure
+    const [onboardingData, setOnboardingData] = useState<OnboardingData>({
+        workoutSchedule: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
+        exerciseProgression: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
+        oneRepMax: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
+        oneRmWeight: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
+        oneRmReps: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
+        trainingMaxPercentage: '90',
     });
 
     // Day selector modal state (like in settings)
     const [daySelectorModalVisible, setDaySelectorModalVisible] = useState(false);
     const [selectedExercise, setSelectedExercise] = useState<keyof typeof workoutSchedule | null>(null);
+
+    // Add state for onboarding day selector modal
+    const [onboardingDaySelectorModalVisible, setOnboardingDaySelectorModalVisible] = useState(false);
+    const [onboardingSelectedExercise, setOnboardingSelectedExercise] = useState<Exercise | null>(null);
+
+    // Add local onboarding unit state
+    const [onboardingUnit, setOnboardingUnit] = useState<'kg' | 'lbs'>(unit || 'kg');
 
     // Restore scroll position when component mounts
     useEffect(() => {
@@ -109,6 +119,15 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         squat: 'Squat',
         deadlift: 'Deadlift',
         overheadPress: 'Overhead Press'
+    };
+
+    // Helper function to get day order for sorting
+    const getDayOrder = (dayName: string): number => {
+        const dayMap: { [key: string]: number } = {
+            'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
+            'Friday': 5, 'Saturday': 6, 'Sunday': 7
+        };
+        return dayMap[dayName] || 0;
     };
 
     const getAvailableDays = (currentExercise: keyof typeof workoutSchedule) => {
@@ -230,19 +249,19 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         // Save all the onboarding data
         Object.entries(onboardingData.workoutSchedule).forEach(([exercise, day]) => {
             if (day) {
-                updateWorkoutDay(exercise as keyof typeof workoutSchedule, day);
+                updateWorkoutDay(exercise as Exercise, day);
             }
         });
 
         Object.entries(onboardingData.exerciseProgression).forEach(([exercise, progression]) => {
             if (progression) {
-                updateExerciseProgression(exercise as keyof typeof exerciseProgression, parseFloat(progression));
+                updateExerciseProgression(exercise as Exercise, parseFloat(progression));
             }
         });
 
         Object.entries(onboardingData.oneRepMax).forEach(([exercise, weight]) => {
             if (weight) {
-                updateOneRepMax(exercise as keyof typeof oneRepMax, parseFloat(weight));
+                updateOneRepMax(exercise as Exercise, parseFloat(weight));
             }
         });
 
@@ -251,27 +270,31 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
             updateTrainingMaxPercentage(parseFloat(onboardingData.trainingMaxPercentage));
         }
 
-        // Complete onboarding
-        await completeOnboarding();
+        // Save unit
+        setUnit(onboardingUnit);
+
+        // Close modal and reset step
         setOnboardingVisible(false);
         setCurrentStep(0);
     };
 
-    const updateOnboardingData = (section: keyof typeof onboardingData, field: string, value: string) => {
-        if (section === 'trainingMaxPercentage') {
-            setOnboardingData(prev => ({
-                ...prev,
-                trainingMaxPercentage: value
-            }));
-        } else {
-            setOnboardingData(prev => ({
-                ...prev,
-                [section]: {
-                    ...prev[section],
-                    [field]: value
-                }
-            }));
-        }
+    // 3. Update updateOnboardingData to be type-safe
+    const updateOnboardingData = (section: keyof OnboardingData, field: Exercise | '', value: string) => {
+        setOnboardingData(prev => {
+            if (section === 'trainingMaxPercentage') {
+                return { ...prev, trainingMaxPercentage: value };
+            } else if (field && typeof prev[section] === 'object' && prev[section] !== null) {
+                return {
+                    ...prev,
+                    [section]: {
+                        ...(prev[section] as Record<Exercise, string>),
+                        [field]: value,
+                    },
+                };
+            } else {
+                return prev;
+            }
+        });
     };
 
     const getStepTitle = (step: number) => {
@@ -308,11 +331,20 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         const baseOneRM = oneRepMax[exercise];
         const trainingMaxPercent = trainingMaxPercentage.percentage / 100;
         const progression = exerciseProgression[exercise];
+        const decreases = trainingMaxDecreases[exercise];
 
         // Training max increases by progression amount each cycle
         const cycleIncrease = progression * (cycle - 1);
         const adjustedOneRM = baseOneRM + cycleIncrease;
-        const trainingMax = adjustedOneRM * trainingMaxPercent;
+
+        // Apply training max percentage
+        let trainingMax = adjustedOneRM * trainingMaxPercent;
+
+        // Apply decreases from failed workouts (10% decrease per failure)
+        if (decreases > 0) {
+            const decreaseMultiplier = Math.pow(0.9, decreases); // 0.9^decreases = 10% decrease per failure
+            trainingMax = trainingMax * decreaseMultiplier;
+        }
 
         return roundToNearest2_5(trainingMax);
     };
@@ -424,7 +456,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                         scheduledDate,
                         status,
                         exercise: exercise as keyof typeof workoutSchedule,
-                        dayOrder: getDayOrder(day) // Add day order for sorting
+                        dayOrder: getDayOrder(day), // Add day order for sorting
+                        week // Add week number for pass/fail logic
                     };
                 })
                 .sort((a, b) => a.dayOrder - b.dayOrder); // Sort by day of week
@@ -482,7 +515,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                             scheduledDate,
                             status: isToday ? 'today' : 'upcoming' as const,
                             exercise: exercise as keyof typeof workoutSchedule,
-                            dayOrder: getDayOrder(day) // Add day order for sorting
+                            dayOrder: getDayOrder(day), // Add day order for sorting
+                            week // Add week number for pass/fail logic
                         };
                     })
                     .sort((a, b) => a.dayOrder - b.dayOrder); // Sort by day of week
@@ -500,15 +534,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
         return cycleData;
     }, [currentCycle, currentWeek, workoutSchedule, oneRepMax, exerciseProgression, trainingMaxPercentage, workingSetPercentages, isOnboardingNeeded, workoutHistory]);
-
-    // Helper function to get day order for sorting
-    const getDayOrder = (dayName: string): number => {
-        const dayMap: { [key: string]: number } = {
-            'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
-            'Friday': 5, 'Saturday': 6, 'Sunday': 7
-        };
-        return dayMap[dayName] || 0;
-    };
 
     const getStatusIcon = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -583,6 +608,25 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         }>;
     }, []);
 
+    const onboardingGetAvailableDays = (currentExercise: Exercise) => {
+        return dayOptions.map(day => {
+            const isCurrent = onboardingData.workoutSchedule[currentExercise] === day;
+            const isUsed = exercises.some(ex => ex !== currentExercise && onboardingData.workoutSchedule[ex] === day);
+            return { day, isCurrent, isUsed };
+        });
+    };
+
+    const onboardingOpenDaySelector = (exercise: Exercise) => {
+        setOnboardingSelectedExercise(exercise);
+        setOnboardingDaySelectorModalVisible(true);
+    };
+
+    const onboardingHandleDaySelect = (exercise: Exercise, day: string) => {
+        updateOnboardingData('workoutSchedule', exercise, day);
+        setOnboardingDaySelectorModalVisible(false);
+        setOnboardingSelectedExercise(null);
+    };
+
     return (
         <>
             <Modal
@@ -594,15 +638,366 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
             >
-                <View style={{ backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background, borderRadius: 12, padding: 20, width: '100%', maxWidth: 400 }}>
-                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
-                        {getStepTitle(currentStep)}
-                    </Text>
-                    <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
-                        {getStepDescription(currentStep)}
-                    </Text>
-                    {/* Render step-specific content here (inputs, selectors, etc.) */}
-                    {/* ... (existing onboarding step content goes here) ... */}
+                <View style={{
+                    backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                    borderRadius: 12,
+                    padding: 20,
+                    width: Platform.OS === 'web' ? 400 : '100%',
+                    maxWidth: 400,
+                    maxHeight: Dimensions.get('window').height * 0.8,
+                    minHeight: 500
+                }}>
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                    >
+                        {/* Step Indicator */}
+                        <Text style={{ fontSize: 16, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
+                            Step {currentStep + 1} of 4
+                        </Text>
+                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
+                            {getStepTitle(currentStep)}
+                        </Text>
+                        <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+                            {getStepDescription(currentStep)}
+                        </Text>
+                        {/* Step Content */}
+                        {currentStep === 0 && (
+                            // Workout Schedule Step with dropdowns
+                            <View style={{ gap: 12 }}>
+                                {exercises.map((exercise) => (
+                                    <View key={exercise} style={{ marginBottom: 8 }}>
+                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                            {exerciseNames[exercise]}
+                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={() => onboardingOpenDaySelector(exercise)}
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                borderWidth: 1,
+                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                borderRadius: 8,
+                                                padding: 12,
+                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                            }}
+                                        >
+                                            <Text style={{ flex: 1, color: isDark ? COLORS.textDark : COLORS.text }}>
+                                                {onboardingData.workoutSchedule[exercise] || 'Select Day'}
+                                            </Text>
+                                            <ChevronDown size={20} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+                                {/* Modal for picking a day */}
+                                <Modal
+                                    isVisible={onboardingDaySelectorModalVisible}
+                                    onBackdropPress={() => setOnboardingDaySelectorModalVisible(false)}
+                                    style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
+                                    backdropOpacity={0.5}
+                                    useNativeDriver={true}
+                                    hideModalContentWhileAnimating={true}
+                                    statusBarTranslucent={true}
+                                >
+                                    <View style={{
+                                        backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
+                                        borderRadius: 12,
+                                        padding: 20,
+                                        width: '100%',
+                                        maxWidth: 400,
+                                        maxHeight: Dimensions.get('window').height * 0.8,
+                                        minHeight: Dimensions.get('window').height * 0.6
+                                    }}>
+                                        <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
+                                            Select Day
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+                                            Choose which day to perform {onboardingSelectedExercise ? exerciseNames[onboardingSelectedExercise] : ''}
+                                        </Text>
+                                        <ScrollView
+                                            style={{ flex: 1 }}
+                                            showsVerticalScrollIndicator={true}
+                                            contentContainerStyle={{ paddingBottom: 20 }}
+                                        >
+                                            <View style={{ gap: 8 }}>
+                                                {onboardingSelectedExercise && onboardingGetAvailableDays(onboardingSelectedExercise).map(({ day, isCurrent, isUsed }) => (
+                                                    <TouchableOpacity
+                                                        key={day}
+                                                        onPress={() => onboardingHandleDaySelect(onboardingSelectedExercise, day)}
+                                                        style={{
+                                                            backgroundColor: isCurrent
+                                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                                : isUsed
+                                                                    ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
+                                                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                            borderWidth: 1,
+                                                            borderColor: isCurrent
+                                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                                : isUsed
+                                                                    ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                                    : (isDark ? COLORS.borderDark : COLORS.border),
+                                                            borderRadius: 8,
+                                                            padding: 16,
+                                                            alignItems: 'center',
+                                                            marginBottom: 8,
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                        disabled={isUsed}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 18,
+                                                                fontWeight: '600',
+                                                                color: isCurrent
+                                                                    ? 'white'
+                                                                    : isUsed
+                                                                        ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                                        : (isDark ? COLORS.textDark : COLORS.text),
+                                                            }}
+                                                        >
+                                                            {day}
+                                                        </Text>
+                                                        {isCurrent && (
+                                                            <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                                        )}
+                                                        {isUsed && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 12,
+                                                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                                                    marginTop: 4,
+                                                                }}
+                                                            >
+                                                                Already used
+                                                            </Text>
+                                                        )}
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </View>
+                                        </ScrollView>
+                                        <TouchableOpacity
+                                            onPress={() => setOnboardingDaySelectorModalVisible(false)}
+                                            style={{
+                                                backgroundColor: 'transparent',
+                                                padding: 16,
+                                                borderRadius: 8,
+                                                alignItems: 'center',
+                                                marginTop: 16,
+                                                borderWidth: 1,
+                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: '600' }}>
+                                                Cancel
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </Modal>
+                            </View>
+                        )}
+                        {currentStep === 1 && (
+                            // Exercise Progression Step
+                            <View style={{ gap: 12 }}>
+                                {/* Unit toggle */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+                                    <Button
+                                        variant={onboardingUnit === 'kg' ? 'primary' : 'outline'}
+                                        onPress={() => setOnboardingUnit('kg')}
+                                        style={{ marginRight: 8 }}
+                                    >
+                                        kg
+                                    </Button>
+                                    <Button
+                                        variant={onboardingUnit === 'lbs' ? 'primary' : 'outline'}
+                                        onPress={() => setOnboardingUnit('lbs')}
+                                    >
+                                        lbs
+                                    </Button>
+                                </View>
+                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
+                                    Set the weight increment for each lift (per cycle) in {onboardingUnit}.
+                                </Text>
+                                {exercises.map((exercise) => (
+                                    <View key={exercise} style={{ marginBottom: 8 }}>
+                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                            {exerciseNames[exercise]}
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <TextInput
+                                                style={{
+                                                    flex: 1,
+                                                    borderWidth: 1,
+                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                    borderRadius: 8,
+                                                    padding: 8,
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                }}
+                                                keyboardType="numeric"
+                                                value={onboardingData.exerciseProgression[exercise]}
+                                                onChangeText={(text) => {
+                                                    let sanitized = text.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                                                    const firstDot = sanitized.indexOf('.');
+                                                    if (firstDot !== -1) {
+                                                        sanitized = sanitized.slice(0, firstDot + 1) + sanitized.slice(firstDot + 1).replace(/\./g, '');
+                                                    }
+                                                    updateOnboardingData('exerciseProgression', exercise, sanitized);
+                                                }}
+                                                placeholder={`e.g. 2.5 or 5`}
+                                            />
+                                            <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                {onboardingUnit}
+                                            </Text>
+                                        </View>
+                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                                            If you can't see a decimal point, try pasting or using a different keyboard.
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+                        {currentStep === 2 && (
+                            // 1RM Calculator Step
+                            <View style={{ gap: 12 }}>
+                                {exercises.map((exercise) => {
+                                    const weight = onboardingData.oneRmWeight[exercise];
+                                    const reps = onboardingData.oneRmReps[exercise];
+                                    // Epley formula
+                                    const calc1RM = weight && reps ? Math.round(parseFloat(weight) * (1 + parseFloat(reps) / 30)) : '';
+                                    return (
+                                        <View key={exercise} style={{ marginBottom: 8 }}>
+                                            <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                                {exerciseNames[exercise]}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                                                <TextInput
+                                                    style={{
+                                                        flex: 1,
+                                                        borderWidth: 1,
+                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                        borderRadius: 8,
+                                                        padding: 8,
+                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                    }}
+                                                    keyboardType="numeric"
+                                                    value={weight}
+                                                    onChangeText={(text) => updateOnboardingData('oneRmWeight', exercise, text.replace(/[^0-9.]/g, ''))}
+                                                    placeholder={`Weight (${onboardingUnit})`}
+                                                />
+                                                <TextInput
+                                                    style={{
+                                                        flex: 1,
+                                                        borderWidth: 1,
+                                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                        borderRadius: 8,
+                                                        padding: 8,
+                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                    }}
+                                                    keyboardType="numeric"
+                                                    value={reps}
+                                                    onChangeText={(text) => updateOnboardingData('oneRmReps', exercise, text.replace(/[^0-9.]/g, ''))}
+                                                    placeholder="Reps"
+                                                />
+                                            </View>
+                                            <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, marginBottom: 4 }}>
+                                                Calculated 1RM: {calc1RM || '--'} {onboardingUnit}
+                                            </Text>
+                                            <TextInput
+                                                style={{
+                                                    borderWidth: 1,
+                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                    borderRadius: 8,
+                                                    padding: 8,
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                }}
+                                                keyboardType="numeric"
+                                                value={onboardingData.oneRepMax[exercise]}
+                                                onChangeText={(text) => updateOnboardingData('oneRepMax', exercise, text.replace(/[^0-9.]/g, ''))}
+                                                placeholder={`Override 1RM (${onboardingUnit})`}
+                                            />
+                                            <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
+                                                You can override the calculated 1RM above if you know your true 1RM.
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        )}
+                        {currentStep === 3 && (
+                            // Training Max Percentage Step
+                            <View style={{ gap: 12 }}>
+                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                    Training Max Percentage
+                                </Text>
+                                <TextInput
+                                    style={{
+                                        borderWidth: 1,
+                                        borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                        borderRadius: 8,
+                                        padding: 8,
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                        backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                    }}
+                                    keyboardType="numeric"
+                                    value={onboardingData.trainingMaxPercentage}
+                                    onChangeText={(text) => updateOnboardingData('trainingMaxPercentage', '', text.replace(/[^0-9.]/g, ''))}
+                                    placeholder="e.g. 90"
+                                />
+                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
+                                    Enter a value between 80 and 100.
+                                </Text>
+
+                                {/* Training Max Decreases Summary */}
+                                <View style={{ marginTop: 24, padding: 12, backgroundColor: isDark ? COLORS.errorDark + '10' : COLORS.error + '10', borderRadius: 8 }}>
+                                    <Text style={{ fontWeight: '600', color: isDark ? COLORS.error : COLORS.errorDark, marginBottom: 8, fontSize: 16, textAlign: 'center' }}>
+                                        Training Max Decreases
+                                    </Text>
+                                    {exercises.map((exercise) => {
+                                        const decreases = trainingMaxDecreases[exercise];
+                                        const hasDecreases = decreases > 0;
+                                        return (
+                                            <View key={exercise} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                                <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 15, fontWeight: '500' }}>
+                                                    {exerciseNames[exercise]}
+                                                </Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                    <Text style={{ color: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary), fontWeight: '600', fontSize: 14 }}>
+                                                        {hasDecreases ? `-${decreases * 10}%` : 'No decrease'}
+                                                    </Text>
+                                                    <TouchableOpacity
+                                                        onPress={() => resetTrainingMaxDecreases(exercise)}
+                                                        style={{
+                                                            backgroundColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                            paddingHorizontal: 10,
+                                                            paddingVertical: 4,
+                                                            borderRadius: 6,
+                                                            borderWidth: 1,
+                                                            borderColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.borderDark : COLORS.border),
+                                                            marginLeft: 8,
+                                                        }}
+                                                        disabled={!hasDecreases}
+                                                    >
+                                                        <Text style={{ color: hasDecreases ? 'white' : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary), fontSize: 12, fontWeight: '600' }}>
+                                                            Reset
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                </View>
+                                            </View>
+                                        );
+                                    })}
+                                    <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 8, textAlign: 'center' }}>
+                                        Failed workouts reduce your training max for the next cycle. You can reset decreases here if needed.
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+                    </ScrollView>
+                    {/* Step Navigation */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 }}>
                         <Button onPress={handleOnboardingBack} variant="outline" disabled={currentStep === 0} style={{ flex: 1, marginRight: 8 }}>
                             Back
@@ -1100,15 +1495,28 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                             </Text>
                                                         )}
                                                     </View>
-                                                    <Text
-                                                        style={{
-                                                            fontSize: 12,
-                                                            color: COLORS.success,
-                                                            fontWeight: '500'
-                                                        }}
-                                                    >
-                                                        ✓ Completed
-                                                    </Text>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 12,
+                                                                color: COLORS.success,
+                                                                fontWeight: '500'
+                                                            }}
+                                                        >
+                                                            ✓ Completed
+                                                        </Text>
+                                                        {lift.reps !== null && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 12,
+                                                                    color: (lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? COLORS.error : COLORS.success,
+                                                                    fontWeight: '500'
+                                                                }}
+                                                            >
+                                                                {(lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? '✗ Failed' : '✓ Passed'}
+                                                            </Text>
+                                                        )}
+                                                    </View>
                                                 </View>
                                             ))}
                                         </View>
