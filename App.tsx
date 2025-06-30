@@ -12,6 +12,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { COLORS } from './src/constants/colors';
+import { WorkoutSessionProvider } from './src/contexts/WorkoutSessionContext';
 
 type Screen = 'home' | 'profile' | 'settings';
 
@@ -85,16 +86,18 @@ const ThemeWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <ThemeWrapper>
-            <SettingsProvider>
-              <AppContent />
-            </SettingsProvider>
-          </ThemeWrapper>
-        </ThemeProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <WorkoutSessionProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <ThemeWrapper>
+              <SettingsProvider>
+                <AppContent />
+              </SettingsProvider>
+            </ThemeWrapper>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </WorkoutSessionProvider>
   );
 }

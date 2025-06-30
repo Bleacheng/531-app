@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { TouchableOpacity, ScrollView, Alert, View, Text } from 'react-native';
+import { TouchableOpacity, ScrollView, Alert, View, Text, Dimensions } from 'react-native';
 import { TextInput } from 'react-native-paper';
 import Modal from 'react-native-modal';
-import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle, CheckCircle, X, Database, Settings } from 'lucide-react-native';
+import { Palette, Scale, Calendar, TrendingUp, ChevronDown, RotateCcw, AlertTriangle, CheckCircle, X, Database, Settings, TrendingDown } from 'lucide-react-native';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { DataBackup } from '../components/DataBackup';
@@ -11,11 +11,14 @@ import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const settingsExercises = ['benchPress', 'squat', 'overheadPress', 'deadlift'] as const;
+
 export const SettingsScreen: React.FC = () => {
     const { theme, setTheme } = useTheme();
     const {
         unit,
         setUnit,
+        toggleUnit,
         formatWeight,
         workoutSchedule,
         updateWorkoutDay,
@@ -30,13 +33,25 @@ export const SettingsScreen: React.FC = () => {
         warmupSets,
         updateWarmupSet,
         toggleWarmupEnabled,
+        variantSettings,
+        updateVariant,
+        updateBbbPercentage,
+        bbbSettings,
+        setBbbSettings,
+        updateBbbEnabled,
         saveScrollPosition,
         getScrollPosition,
         setWorkoutSchedule,
         setExerciseProgression,
         setOneRepMax,
         setTrainingMaxPercentage,
-        setWarmupSets
+        setWarmupSets,
+        setVariantSettings,
+        trainingMaxDecreases,
+        decreaseTrainingMax,
+        resetTrainingMaxDecreases,
+        clearWorkoutHistory,
+        clearTrainingMaxDecreases
     } = useSettings();
     const isDark = theme === 'dark';
 
@@ -77,6 +92,58 @@ export const SettingsScreen: React.FC = () => {
         set3Reps: warmupSets.set3.reps > 0 ? warmupSets.set3.reps.toString() : '',
     });
 
+    // Local state for variant inputs
+    const [variantInputs, setVariantInputs] = useState({
+        bbbPercentage: variantSettings.bbbPercentage > 0 ? variantSettings.bbbPercentage.toString() : '50',
+    });
+
+    // Local state for BBB inputs
+    const [bbbInputs, setBbbInputs] = useState({
+        percentage: bbbSettings.percentage > 0 ? bbbSettings.percentage.toString() : '50',
+    });
+
+    // Update local state when context values change
+    useEffect(() => {
+        setProgressionInputs({
+            benchPress: exerciseProgression.benchPress > 0 ? exerciseProgression.benchPress.toString() : '',
+            squat: exerciseProgression.squat > 0 ? exerciseProgression.squat.toString() : '',
+            deadlift: exerciseProgression.deadlift > 0 ? exerciseProgression.deadlift.toString() : '',
+            overheadPress: exerciseProgression.overheadPress > 0 ? exerciseProgression.overheadPress.toString() : '',
+        });
+    }, [exerciseProgression]);
+
+    useEffect(() => {
+        setOneRepMaxInputs({
+            benchPress: oneRepMax.benchPress > 0 ? oneRepMax.benchPress.toString() : '',
+            squat: oneRepMax.squat > 0 ? oneRepMax.squat.toString() : '',
+            deadlift: oneRepMax.deadlift > 0 ? oneRepMax.deadlift.toString() : '',
+            overheadPress: oneRepMax.overheadPress > 0 ? oneRepMax.overheadPress.toString() : '',
+        });
+    }, [oneRepMax]);
+
+    useEffect(() => {
+        setWarmupInputs({
+            set1Percentage: warmupSets.set1.percentage > 0 ? warmupSets.set1.percentage.toString() : '',
+            set1Reps: warmupSets.set1.reps > 0 ? warmupSets.set1.reps.toString() : '',
+            set2Percentage: warmupSets.set2.percentage > 0 ? warmupSets.set2.percentage.toString() : '',
+            set2Reps: warmupSets.set2.reps > 0 ? warmupSets.set2.reps.toString() : '',
+            set3Percentage: warmupSets.set3.percentage > 0 ? warmupSets.set3.percentage.toString() : '',
+            set3Reps: warmupSets.set3.reps > 0 ? warmupSets.set3.reps.toString() : '',
+        });
+    }, [warmupSets]);
+
+    useEffect(() => {
+        setVariantInputs({
+            bbbPercentage: variantSettings.bbbPercentage > 0 ? variantSettings.bbbPercentage.toString() : '50',
+        });
+    }, [variantSettings]);
+
+    useEffect(() => {
+        setBbbInputs({
+            percentage: bbbSettings.percentage > 0 ? bbbSettings.percentage.toString() : '50',
+        });
+    }, [bbbSettings]);
+
     // Training max percentage options (80% to 100% in 5% increments)
     const trainingMaxOptions = [
         { value: 80, label: '80%' },
@@ -84,6 +151,12 @@ export const SettingsScreen: React.FC = () => {
         { value: 90, label: '90%' },
         { value: 95, label: '95%' },
         { value: 100, label: '100%' },
+    ];
+
+    // Variant options
+    const variantOptions = [
+        { value: 'nothing' as const, label: 'Nothing', description: 'No additional work' },
+        { value: 'bigButBoring' as const, label: 'Big But Boring', description: '5 sets of 10 reps at BBB% of TM' },
     ];
 
     // Local state for modals
@@ -196,16 +269,51 @@ export const SettingsScreen: React.FC = () => {
     };
 
     const handleWarmupBlur = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps') => {
-        const inputKey = `${set}${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof typeof warmupInputs;
-        const numValue = parseFloat(warmupInputs[inputKey]);
-        const currentValue = field === 'percentage' ? warmupSets[set].percentage : warmupSets[set].reps;
-
-        if (isNaN(numValue) || numValue <= 0 || (field === 'percentage' && numValue > 100)) {
+        const currentValue = warmupInputs[`${set}${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof typeof warmupInputs];
+        const numValue = parseFloat(currentValue);
+        if (isNaN(numValue) || numValue <= 0) {
             // Reset to current value if invalid
+            const currentWarmupValue = warmupSets[set][field];
             setWarmupInputs(prev => ({
                 ...prev,
-                [inputKey]: currentValue > 0 ? currentValue.toString() : ''
+                [`${set}${field.charAt(0).toUpperCase() + field.slice(1)}`]: currentWarmupValue > 0 ? currentWarmupValue.toString() : ''
             }));
+        }
+    };
+
+    // Handle variant changes
+    const handleVariantChange = (variant: 'nothing' | 'bigButBoring') => {
+        updateVariant(variant);
+        // Automatically enable/disable BBB based on variant selection
+        updateBbbEnabled(variant === 'bigButBoring');
+    };
+
+    const handleBbbPercentageBlur = () => {
+        const numValue = parseFloat(variantInputs.bbbPercentage);
+        if (isNaN(numValue) || numValue <= 0 || numValue > 100) {
+            // Reset to current value if invalid
+            setVariantInputs(prev => ({
+                ...prev,
+                bbbPercentage: variantSettings.bbbPercentage > 0 ? variantSettings.bbbPercentage.toString() : '50'
+            }));
+        } else {
+            // Update the variant settings with the valid percentage
+            updateBbbPercentage(numValue);
+        }
+    };
+
+    // Handle BBB changes
+    const handleBbbPercentageChange = (value: string) => {
+        // Always update local state
+        setBbbInputs(prev => ({
+            ...prev,
+            percentage: value
+        }));
+
+        // Only update context if it's a valid number
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0 && numValue <= 100) {
+            updateBbbPercentage(numValue);
         }
     };
 
@@ -217,99 +325,130 @@ export const SettingsScreen: React.FC = () => {
         setResetDataModalVisible(true);
     };
 
-    const confirmResetSettings = () => {
-        // Reset theme to light
-        setTheme('light');
+    const confirmResetSettings = async () => {
+        try {
+            // Reset theme to light
+            setTheme('light');
 
-        // Reset unit to kg
-        setUnit('kg');
+            // Reset unit to kg
+            setUnit('kg');
 
-        // Reset workout schedule to empty values to force onboarding
-        const emptySchedule = {
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        };
-        setWorkoutSchedule(emptySchedule);
+            // Clear workout history and training max decreases
+            await Promise.all([
+                clearWorkoutHistory(),
+                clearTrainingMaxDecreases(),
+            ]);
 
-        // Reset exercise progression to empty values to force onboarding
-        const emptyProgression = {
-            benchPress: 0,
-            squat: 0,
-            deadlift: 0,
-            overheadPress: 0,
-        };
-        setExerciseProgression(emptyProgression);
+            // Reset workout schedule to empty values to force onboarding
+            const emptySchedule = {
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            };
+            setWorkoutSchedule(emptySchedule);
 
-        // Reset 1RM to empty values to force onboarding
-        const emptyOneRepMax = {
-            benchPress: 0,
-            squat: 0,
-            deadlift: 0,
-            overheadPress: 0,
-        };
-        setOneRepMax(emptyOneRepMax);
+            // Reset exercise progression to empty values to force onboarding
+            const emptyProgression = {
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            };
+            setExerciseProgression(emptyProgression);
 
-        // Reset training max percentage to empty values to force onboarding
-        const emptyTrainingMax = {
-            percentage: 0,
-        };
-        setTrainingMaxPercentage(emptyTrainingMax);
+            // Reset 1RM to empty values to force onboarding
+            const emptyOneRepMax = {
+                benchPress: 0,
+                squat: 0,
+                deadlift: 0,
+                overheadPress: 0,
+            };
+            setOneRepMax(emptyOneRepMax);
 
-        // Reset warm-up sets to defaults
-        const defaultWarmup = {
-            set1: { percentage: 40, reps: 5 },
-            set2: { percentage: 50, reps: 5 },
-            set3: { percentage: 60, reps: 3 },
-            enabled: true,
-        };
-        setWarmupSets(defaultWarmup);
+            // Reset training max percentage to empty values to force onboarding
+            const emptyTrainingMax = {
+                percentage: 0,
+            };
+            setTrainingMaxPercentage(emptyTrainingMax);
 
-        // Update local state for progression inputs
-        setProgressionInputs({
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        });
+            // Reset warm-up sets to defaults
+            const defaultWarmup = {
+                set1: { percentage: 40, reps: 5 },
+                set2: { percentage: 50, reps: 5 },
+                set3: { percentage: 60, reps: 3 },
+                enabled: true,
+            };
+            setWarmupSets(defaultWarmup);
 
-        // Update local state for 1RM inputs
-        setOneRepMaxInputs({
-            benchPress: '',
-            squat: '',
-            deadlift: '',
-            overheadPress: '',
-        });
+            // Reset variant settings to defaults
+            const defaultVariant = {
+                variant: 'nothing' as const,
+                bbbPercentage: 50,
+            };
+            setVariantSettings(defaultVariant);
 
-        // Update local state for warm-up inputs
-        setWarmupInputs({
-            set1Percentage: defaultWarmup.set1.percentage.toString(),
-            set1Reps: defaultWarmup.set1.reps.toString(),
-            set2Percentage: defaultWarmup.set2.percentage.toString(),
-            set2Reps: defaultWarmup.set2.reps.toString(),
-            set3Percentage: defaultWarmup.set3.percentage.toString(),
-            set3Reps: defaultWarmup.set3.reps.toString(),
-        });
+            // Reset BBB settings to defaults
+            const defaultBbb = {
+                enabled: false,
+                percentage: 50,
+            };
+            setBbbSettings(defaultBbb);
 
-        setResetSettingsModalVisible(false);
+            // Update local state for progression inputs
+            setProgressionInputs({
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            });
 
-        Alert.alert(
-            'Settings Reset',
-            'All settings have been reset. You will need to complete setup again.',
-            [{ text: 'OK' }]
-        );
+            // Update local state for 1RM inputs
+            setOneRepMaxInputs({
+                benchPress: '',
+                squat: '',
+                deadlift: '',
+                overheadPress: '',
+            });
+
+            // Update local state for warm-up inputs
+            setWarmupInputs({
+                set1Percentage: defaultWarmup.set1.percentage.toString(),
+                set1Reps: defaultWarmup.set1.reps.toString(),
+                set2Percentage: defaultWarmup.set2.percentage.toString(),
+                set2Reps: defaultWarmup.set2.reps.toString(),
+                set3Percentage: defaultWarmup.set3.percentage.toString(),
+                set3Reps: defaultWarmup.set3.reps.toString(),
+            });
+
+            // Update local state for variant inputs
+            setVariantInputs({
+                bbbPercentage: defaultVariant.bbbPercentage.toString(),
+            });
+
+            setResetSettingsModalVisible(false);
+
+            Alert.alert(
+                'Settings Reset',
+                'All settings and workout data have been reset. You will need to complete setup again.',
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Error resetting settings:', error);
+            Alert.alert(
+                'Error',
+                'Failed to reset settings. Please try again.',
+                [{ text: 'OK' }]
+            );
+        }
     };
 
     const confirmResetData = async () => {
         try {
-            // Clear all workout-related data from AsyncStorage
+            // Clear workout history and training max decreases using context functions
             await Promise.all([
-                AsyncStorage.removeItem('workout_trainingMaxes'),
-                AsyncStorage.removeItem('workout_personalRecords'),
-                AsyncStorage.removeItem('workout_history'),
-                AsyncStorage.removeItem('workout_currentCycle'),
-                AsyncStorage.removeItem('workout_currentWeek'),
+                clearWorkoutHistory(),
+                clearTrainingMaxDecreases(),
             ]);
 
             // Reset settings to empty values to force onboarding
@@ -334,6 +473,14 @@ export const SettingsScreen: React.FC = () => {
             const emptyTrainingMax = {
                 percentage: 0,
             };
+            const emptyVariant = {
+                variant: 'nothing' as const,
+                bbbPercentage: 50,
+            };
+            const emptyBbb = {
+                enabled: false,
+                percentage: 50,
+            };
 
             // Save empty values
             await Promise.all([
@@ -341,6 +488,8 @@ export const SettingsScreen: React.FC = () => {
                 setExerciseProgression(emptyProgression),
                 setOneRepMax(emptyOneRepMax),
                 setTrainingMaxPercentage(emptyTrainingMax),
+                setVariantSettings(emptyVariant),
+                setBbbSettings(emptyBbb),
             ]);
 
             // Update local state to reflect empty values
@@ -459,10 +608,6 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
-                animationIn="fadeIn"
-                animationOut="fadeOut"
-                animationInTiming={200}
-                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -471,6 +616,8 @@ export const SettingsScreen: React.FC = () => {
                         padding: 20,
                         width: '100%',
                         maxWidth: 400,
+                        maxHeight: Dimensions.get('window').height * 0.8,
+                        minHeight: Dimensions.get('window').height * 0.6,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.25,
@@ -502,61 +649,67 @@ export const SettingsScreen: React.FC = () => {
                         </Text>
                     </View>
 
-                    {/* Day Options */}
-                    <View style={{ gap: 8 }}>
-                        {selectedExercise && getAvailableDays(selectedExercise).map(({ day, isCurrent, hasConflict, conflictingExercise }) => (
-                            <TouchableOpacity
-                                key={day}
-                                onPress={() => handleDaySelect(selectedExercise, day)}
-                                style={{
-                                    backgroundColor: isCurrent
-                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                        : hasConflict
-                                            ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
-                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                    borderWidth: 1,
-                                    borderColor: isCurrent
-                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                        : hasConflict
-                                            ? (isDark ? COLORS.error : COLORS.errorDark)
-                                            : (isDark ? COLORS.borderDark : COLORS.border),
-                                    borderRadius: 8,
-                                    padding: 16,
-                                    alignItems: 'center',
-                                }}
-                                activeOpacity={0.8}
-                                disabled={hasConflict}
-                            >
-                                <Text
+                    {/* Day Options - Scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                    >
+                        <View style={{ gap: 8 }}>
+                            {selectedExercise && getAvailableDays(selectedExercise).map(({ day, isCurrent, hasConflict, conflictingExercise }) => (
+                                <TouchableOpacity
+                                    key={day}
+                                    onPress={() => handleDaySelect(selectedExercise, day)}
                                     style={{
-                                        fontSize: 18,
-                                        fontWeight: '600',
-                                        color: isCurrent
-                                            ? 'white'
+                                        backgroundColor: isCurrent
+                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                            : hasConflict
+                                                ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20')
+                                                : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                        borderWidth: 1,
+                                        borderColor: isCurrent
+                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
                                             : hasConflict
                                                 ? (isDark ? COLORS.error : COLORS.errorDark)
-                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                                : (isDark ? COLORS.borderDark : COLORS.border),
+                                        borderRadius: 8,
+                                        padding: 16,
+                                        alignItems: 'center',
                                     }}
+                                    activeOpacity={0.8}
+                                    disabled={hasConflict}
                                 >
-                                    {day}
-                                </Text>
-                                {isCurrent && (
-                                    <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
-                                )}
-                                {hasConflict && (
                                     <Text
                                         style={{
-                                            fontSize: 12,
-                                            color: isDark ? COLORS.error : COLORS.errorDark,
-                                            marginTop: 4,
+                                            fontSize: 18,
+                                            fontWeight: '600',
+                                            color: isCurrent
+                                                ? 'white'
+                                                : hasConflict
+                                                    ? (isDark ? COLORS.error : COLORS.errorDark)
+                                                    : (isDark ? COLORS.textDark : COLORS.text),
                                         }}
                                     >
-                                        Conflicts with {conflictingExercise}
+                                        {day}
                                     </Text>
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                                    {isCurrent && (
+                                        <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                    )}
+                                    {hasConflict && (
+                                        <Text
+                                            style={{
+                                                fontSize: 12,
+                                                color: isDark ? COLORS.error : COLORS.errorDark,
+                                                marginTop: 4,
+                                            }}
+                                        >
+                                            Conflicts with {conflictingExercise}
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </ScrollView>
 
                     {/* Cancel Button */}
                     <TouchableOpacity
@@ -595,10 +748,6 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
-                animationIn="fadeIn"
-                animationOut="fadeOut"
-                animationInTiming={200}
-                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -607,6 +756,8 @@ export const SettingsScreen: React.FC = () => {
                         padding: 20,
                         width: '100%',
                         maxWidth: 400,
+                        maxHeight: Dimensions.get('window').height * 0.8,
+                        minHeight: Dimensions.get('window').height * 0.6,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.25,
@@ -639,104 +790,111 @@ export const SettingsScreen: React.FC = () => {
                         </Text>
                     </View>
 
-                    {/* Warning */}
-                    <View
-                        style={{
-                            backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
-                            padding: 16,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                            marginBottom: 20,
-                        }}
+                    {/* Content - Scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
                     >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                        {/* Warning */}
+                        <View
+                            style={{
+                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                                padding: 16,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.error : COLORS.errorDark,
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    Warning
+                                </Text>
+                            </View>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                    lineHeight: 16,
+                                }}
+                            >
+                                This action will reset all your app settings to empty values, requiring you to complete the setup process again. Your workout data will not be affected.
+                            </Text>
+                        </View>
+
+                        {/* What will be reset */}
+                        <View style={{ marginBottom: 20 }}>
                             <Text
                                 style={{
                                     fontSize: 14,
                                     fontWeight: '600',
-                                    color: isDark ? COLORS.error : COLORS.errorDark,
-                                    marginLeft: 6,
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 8,
                                 }}
                             >
-                                Warning
+                                Settings that will be reset:
                             </Text>
+                            <View style={{ gap: 4 }}>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Theme: Light
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Units: Kilograms (kg)
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Workout Schedule: Empty (requires setup)
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Exercise Progression: Empty (requires setup)
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • 1 Rep Max Values: Empty (requires setup)
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Training Max Percentage: Empty (requires setup)
+                                </Text>
+                            </View>
                         </View>
-                        <Text
-                            style={{
-                                fontSize: 12,
-                                color: isDark ? COLORS.error : COLORS.errorDark,
-                                lineHeight: 16,
-                            }}
-                        >
-                            This action will reset all your app settings to empty values, requiring you to complete the setup process again. Your workout data will not be affected.
-                        </Text>
-                    </View>
-
-                    {/* What will be reset */}
-                    <View style={{ marginBottom: 20 }}>
-                        <Text
-                            style={{
-                                fontSize: 14,
-                                fontWeight: '600',
-                                color: isDark ? COLORS.textDark : COLORS.text,
-                                marginBottom: 8,
-                            }}
-                        >
-                            Settings that will be reset:
-                        </Text>
-                        <View style={{ gap: 4 }}>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Theme: Light
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Units: Kilograms (kg)
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Workout Schedule: Empty (requires setup)
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Exercise Progression: Empty (requires setup)
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • 1 Rep Max Values: Empty (requires setup)
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Training Max Percentage: Empty (requires setup)
-                            </Text>
-                        </View>
-                    </View>
+                    </ScrollView>
 
                     {/* Buttons */}
                     <View style={{ gap: 12 }}>
@@ -800,10 +958,6 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
-                animationIn="fadeIn"
-                animationOut="fadeOut"
-                animationInTiming={200}
-                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -812,6 +966,8 @@ export const SettingsScreen: React.FC = () => {
                         padding: 20,
                         width: '100%',
                         maxWidth: 400,
+                        maxHeight: Dimensions.get('window').height * 0.8,
+                        minHeight: Dimensions.get('window').height * 0.6,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.25,
@@ -844,96 +1000,103 @@ export const SettingsScreen: React.FC = () => {
                         </Text>
                     </View>
 
-                    {/* Warning */}
-                    <View
-                        style={{
-                            backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
-                            padding: 16,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                            marginBottom: 20,
-                        }}
+                    {/* Content - Scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
                     >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                        {/* Warning */}
+                        <View
+                            style={{
+                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                                padding: 16,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.error : COLORS.errorDark,
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    Critical Warning
+                                </Text>
+                            </View>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                    lineHeight: 16,
+                                }}
+                            >
+                                This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will also be reset to defaults.
+                            </Text>
+                        </View>
+
+                        {/* What will be reset */}
+                        <View style={{ marginBottom: 20 }}>
                             <Text
                                 style={{
                                     fontSize: 14,
                                     fontWeight: '600',
-                                    color: isDark ? COLORS.error : COLORS.errorDark,
-                                    marginLeft: 6,
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 8,
                                 }}
                             >
-                                Critical Warning
+                                Data that will be deleted:
                             </Text>
+                            <View style={{ gap: 4 }}>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • All workout history
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Personal records
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Training maxes
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Current cycle and week progress
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • All app settings (workout schedule, progression, 1RM, etc.)
+                                </Text>
+                            </View>
                         </View>
-                        <Text
-                            style={{
-                                fontSize: 12,
-                                color: isDark ? COLORS.error : COLORS.errorDark,
-                                lineHeight: 16,
-                            }}
-                        >
-                            This action will permanently delete all your workout history, personal records, training maxes, and progress data. Your app settings will also be reset to defaults.
-                        </Text>
-                    </View>
-
-                    {/* What will be reset */}
-                    <View style={{ marginBottom: 20 }}>
-                        <Text
-                            style={{
-                                fontSize: 14,
-                                fontWeight: '600',
-                                color: isDark ? COLORS.textDark : COLORS.text,
-                                marginBottom: 8,
-                            }}
-                        >
-                            Data that will be deleted:
-                        </Text>
-                        <View style={{ gap: 4 }}>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • All workout history
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Personal records
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Training maxes
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Current cycle and week progress
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • All app settings (workout schedule, progression, 1RM, etc.)
-                            </Text>
-                        </View>
-                    </View>
+                    </ScrollView>
 
                     {/* Buttons */}
                     <View style={{ gap: 12 }}>
@@ -997,10 +1160,6 @@ export const SettingsScreen: React.FC = () => {
                 useNativeDriver={true}
                 hideModalContentWhileAnimating={true}
                 statusBarTranslucent={true}
-                animationIn="fadeIn"
-                animationOut="fadeOut"
-                animationInTiming={200}
-                animationOutTiming={200}
             >
                 <View
                     style={{
@@ -1009,6 +1168,8 @@ export const SettingsScreen: React.FC = () => {
                         padding: 20,
                         width: '100%',
                         maxWidth: 400,
+                        maxHeight: Dimensions.get('window').height * 0.8,
+                        minHeight: Dimensions.get('window').height * 0.6,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                         shadowOffset: { width: 0, height: 2 },
                         shadowOpacity: 0.25,
@@ -1040,43 +1201,49 @@ export const SettingsScreen: React.FC = () => {
                         </Text>
                     </View>
 
-                    {/* Options */}
-                    <View style={{ gap: 8 }}>
-                        {trainingMaxOptions.map((option) => (
-                            <TouchableOpacity
-                                key={option.value}
-                                onPress={() => handleTrainingMaxSelect(option.value)}
-                                style={{
-                                    backgroundColor: trainingMaxPercentage.percentage === option.value
-                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                        : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
-                                    borderWidth: 1,
-                                    borderColor: trainingMaxPercentage.percentage === option.value
-                                        ? (isDark ? COLORS.primary : COLORS.primaryDark)
-                                        : (isDark ? COLORS.borderDark : COLORS.border),
-                                    borderRadius: 8,
-                                    padding: 16,
-                                    alignItems: 'center',
-                                }}
-                                activeOpacity={0.8}
-                            >
-                                <Text
+                    {/* Options - Scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                    >
+                        <View style={{ gap: 8 }}>
+                            {trainingMaxOptions.map((option) => (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    onPress={() => handleTrainingMaxSelect(option.value)}
                                     style={{
-                                        fontSize: 18,
-                                        fontWeight: '600',
-                                        color: trainingMaxPercentage.percentage === option.value
-                                            ? 'white'
-                                            : (isDark ? COLORS.textDark : COLORS.text),
+                                        backgroundColor: trainingMaxPercentage.percentage === option.value
+                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                            : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                        borderWidth: 1,
+                                        borderColor: trainingMaxPercentage.percentage === option.value
+                                            ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                            : (isDark ? COLORS.borderDark : COLORS.border),
+                                        borderRadius: 8,
+                                        padding: 16,
+                                        alignItems: 'center',
                                     }}
+                                    activeOpacity={0.8}
                                 >
-                                    {option.label}
-                                </Text>
-                                {trainingMaxPercentage.percentage === option.value && (
-                                    <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                                    <Text
+                                        style={{
+                                            fontSize: 18,
+                                            fontWeight: '600',
+                                            color: trainingMaxPercentage.percentage === option.value
+                                                ? 'white'
+                                                : (isDark ? COLORS.textDark : COLORS.text),
+                                        }}
+                                    >
+                                        {option.label}
+                                    </Text>
+                                    {trainingMaxPercentage.percentage === option.value && (
+                                        <CheckCircle size={20} color="white" style={{ marginTop: 4 }} />
+                                    )}
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </ScrollView>
 
                     {/* Cancel Button */}
                     <TouchableOpacity
@@ -1211,7 +1378,7 @@ export const SettingsScreen: React.FC = () => {
                         </View>
 
                         <View style={{ gap: 12 }}>
-                            {Object.entries(exerciseNames).map(([key, name]) => (
+                            {settingsExercises.map((key) => (
                                 <View key={key} style={{ gap: 8 }}>
                                     <Text
                                         style={{
@@ -1220,7 +1387,7 @@ export const SettingsScreen: React.FC = () => {
                                             color: isDark ? COLORS.textDark : COLORS.text,
                                         }}
                                     >
-                                        {name}
+                                        {exerciseNames[key]}
                                     </Text>
                                     {renderDaySelector(key as keyof typeof workoutSchedule)}
                                 </View>
@@ -1247,7 +1414,7 @@ export const SettingsScreen: React.FC = () => {
                         </View>
 
                         <View style={{ gap: 12 }}>
-                            {Object.entries(exerciseNames).map(([key, name]) => (
+                            {settingsExercises.map((key) => (
                                 <View key={key} style={{ gap: 8 }}>
                                     <Text
                                         style={{
@@ -1256,7 +1423,7 @@ export const SettingsScreen: React.FC = () => {
                                             color: isDark ? COLORS.textDark : COLORS.text,
                                         }}
                                     >
-                                        {name}
+                                        {exerciseNames[key]}
                                     </Text>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                         <Text
@@ -1265,11 +1432,18 @@ export const SettingsScreen: React.FC = () => {
                                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                             }}
                                         >
-                                            +{unit}
+                                            +
                                         </Text>
                                         <TextInput
                                             value={progressionInputs[key as keyof typeof progressionInputs]}
-                                            onChangeText={(value) => handleProgressionChange(key as keyof typeof exerciseProgression, value)}
+                                            onChangeText={(value) => {
+                                                let sanitized = value.replace(/,/g, '.').replace(/[^0-9.]/g, '');
+                                                const firstDot = sanitized.indexOf('.');
+                                                if (firstDot !== -1) {
+                                                    sanitized = sanitized.slice(0, firstDot + 1) + sanitized.slice(firstDot + 1).replace(/\./g, '');
+                                                }
+                                                handleProgressionChange(key as keyof typeof exerciseProgression, sanitized);
+                                            }}
                                             onBlur={() => handleProgressionBlur(key as keyof typeof exerciseProgression)}
                                             mode="outlined"
                                             keyboardType="numeric"
@@ -1281,9 +1455,126 @@ export const SettingsScreen: React.FC = () => {
                                                 fontSize: 16,
                                             }}
                                         />
+                                        <Text
+                                            style={{
+                                                fontSize: 14,
+                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            }}
+                                        >
+                                            {unit}
+                                        </Text>
                                     </View>
+                                    <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>
+                                        If you can't see a decimal point, try pasting or using a different keyboard.
+                                    </Text>
                                 </View>
                             ))}
+                        </View>
+                    </Card>
+
+                    {/* Training Max Decreases Settings */}
+                    <Card
+                        title="Training Max Decreases"
+                        borderColor={isDark ? COLORS.errorLight : COLORS.error}
+                    >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                            <TrendingDown size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                            <Text
+                                style={{
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginLeft: 8,
+                                    fontSize: 14,
+                                }}
+                            >
+                                Failed workouts reduce training max by 10% for next cycle
+                            </Text>
+                        </View>
+
+                        <View style={{ gap: 12 }}>
+                            {settingsExercises.map((key) => {
+                                const decreases = trainingMaxDecreases[key as keyof typeof trainingMaxDecreases];
+                                const hasDecreases = decreases > 0;
+
+                                return (
+                                    <View key={key} style={{
+                                        gap: 8,
+                                        backgroundColor: hasDecreases ? (isDark ? COLORS.errorDark + '20' : COLORS.error + '20') : 'transparent',
+                                        padding: hasDecreases ? 12 : 0,
+                                        borderRadius: hasDecreases ? 8 : 0,
+                                        borderWidth: hasDecreases ? 1 : 0,
+                                        borderColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : 'transparent'
+                                    }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Text
+                                                style={{
+                                                    fontSize: 16,
+                                                    fontWeight: '600',
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                }}
+                                            >
+                                                {exerciseNames[key]}
+                                            </Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                                {hasDecreases && (
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 14,
+                                                            color: isDark ? COLORS.error : COLORS.errorDark,
+                                                            fontWeight: '600',
+                                                        }}
+                                                    >
+                                                        -{decreases * 10}%
+                                                    </Text>
+                                                )}
+                                                <TouchableOpacity
+                                                    onPress={() => resetTrainingMaxDecreases(key as keyof typeof workoutSchedule)}
+                                                    style={{
+                                                        backgroundColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                        paddingHorizontal: 12,
+                                                        paddingVertical: 6,
+                                                        borderRadius: 6,
+                                                        borderWidth: 1,
+                                                        borderColor: hasDecreases ? (isDark ? COLORS.error : COLORS.errorDark) : (isDark ? COLORS.borderDark : COLORS.border),
+                                                    }}
+                                                    disabled={!hasDecreases}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            fontSize: 12,
+                                                            color: hasDecreases ? 'white' : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
+                                                            fontWeight: '600',
+                                                        }}
+                                                    >
+                                                        Reset
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        </View>
+                                        {hasDecreases && (
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                    fontStyle: 'italic',
+                                                }}
+                                            >
+                                                Training max reduced by {decreases * 10}% due to {decreases} failed workout{decreases > 1 ? 's' : ''}
+                                            </Text>
+                                        )}
+                                        {!hasDecreases && (
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                    fontStyle: 'italic',
+                                                }}
+                                            >
+                                                No decreases applied
+                                            </Text>
+                                        )}
+                                    </View>
+                                );
+                            })}
                         </View>
                     </Card>
 
@@ -1318,7 +1609,7 @@ export const SettingsScreen: React.FC = () => {
                                 1 Rep Max (1RM)
                             </Text>
                             <View style={{ gap: 12 }}>
-                                {Object.entries(exerciseNames).map(([key, name]) => (
+                                {settingsExercises.map((key) => (
                                     <View key={key} style={{ gap: 8 }}>
                                         <Text
                                             style={{
@@ -1326,7 +1617,7 @@ export const SettingsScreen: React.FC = () => {
                                                 color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                             }}
                                         >
-                                            {name}
+                                            {exerciseNames[key]}
                                         </Text>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <TextInput
@@ -1405,6 +1696,125 @@ export const SettingsScreen: React.FC = () => {
                                 </View>
                                 <ChevronDown size={20} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                             </TouchableOpacity>
+                        </View>
+
+                        {/* Variant Settings */}
+                        <View style={{ marginBottom: 20 }}>
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Variant
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Choose additional work to perform after main sets
+                            </Text>
+                            <View style={{ gap: 12 }}>
+                                {variantOptions.map((option) => (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        onPress={() => handleVariantChange(option.value)}
+                                        style={{
+                                            backgroundColor: variantSettings.variant === option.value
+                                                ? (isDark ? COLORS.primaryDark + '20' : COLORS.primary + '20')
+                                                : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                            borderWidth: 1,
+                                            borderColor: variantSettings.variant === option.value
+                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                : (isDark ? COLORS.borderDark : COLORS.border),
+                                            borderRadius: 8,
+                                            padding: 12,
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    style={{
+                                                        fontSize: 16,
+                                                        fontWeight: '600',
+                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                        marginBottom: 4,
+                                                    }}
+                                                >
+                                                    {option.label}
+                                                </Text>
+                                                <Text
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                    }}
+                                                >
+                                                    {option.description}
+                                                </Text>
+                                            </View>
+                                            {variantSettings.variant === option.value && (
+                                                <CheckCircle size={20} color={isDark ? COLORS.primary : COLORS.primaryDark} />
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            {/* BBB Percentage Input - Only show when Big But Boring is selected */}
+                            {variantSettings.variant === 'bigButBoring' && (
+                                <View style={{ marginTop: 16 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 14,
+                                            fontWeight: '600',
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        BBB Percentage of Training Max
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        Percentage of training max to use for BBB sets (typically 40-60%)
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <TextInput
+                                            style={{
+                                                flex: 1,
+                                                borderWidth: 1,
+                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                borderRadius: 8,
+                                                padding: 12,
+                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                fontSize: 16,
+                                            }}
+                                            keyboardType="numeric"
+                                            value={variantInputs.bbbPercentage}
+                                            onChangeText={(text) => {
+                                                const sanitized = text.replace(/[^0-9.]/g, '');
+                                                setVariantInputs(prev => ({ ...prev, bbbPercentage: sanitized }));
+                                            }}
+                                            onBlur={handleBbbPercentageBlur}
+                                            placeholder="50"
+                                        />
+                                        <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 16 }}>
+                                            %
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
                         </View>
 
                         {/* Working Set Percentages Info */}
@@ -1693,12 +2103,9 @@ export const SettingsScreen: React.FC = () => {
                             <Button
                                 onPress={handleResetSettings}
                                 variant="outline"
-                                fullWidth
-                                style={{
-                                    borderColor: isDark ? COLORS.warning : COLORS.warningDark,
-                                }}
+                                style={{ backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20' }}
                             >
-                                Reset Settings
+                                Reset All Settings
                             </Button>
                         </View>
 
@@ -1729,12 +2136,35 @@ export const SettingsScreen: React.FC = () => {
                             <Button
                                 onPress={handleResetData}
                                 variant="outline"
-                                fullWidth
-                                style={{
-                                    borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                                }}
+                                style={{ backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20' }}
                             >
-                                Clear All Data
+                                Reset All Data
+                            </Button>
+                        </View>
+
+                        <View style={{ gap: 12 }}>
+                            <Button
+                                onPress={() => {
+                                    Alert.alert(
+                                        'Clear Workout History',
+                                        'This will clear all workout history but keep your settings. This can help fix date issues.',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            {
+                                                text: 'Clear History',
+                                                style: 'destructive',
+                                                onPress: () => {
+                                                    clearWorkoutHistory();
+                                                    Alert.alert('Success', 'Workout history cleared.');
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                variant="outline"
+                                style={{ backgroundColor: isDark ? COLORS.warningDark + '20' : COLORS.warning + '20' }}
+                            >
+                                Clear Workout History Only
                             </Button>
                         </View>
                     </Card>

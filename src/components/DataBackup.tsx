@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Share, Platform, TouchableOpacity, View, Text } from 'react-native';
+import { Alert, Share, Platform, TouchableOpacity, View, Text, ScrollView, Dimensions } from 'react-native';
 import Modal from 'react-native-modal';
 import { Download, Upload, FileText, AlertTriangle, CheckCircle, X } from 'lucide-react-native';
 import { Card } from './Card';
@@ -141,6 +141,8 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
                         padding: 20,
                         width: '100%',
                         maxWidth: 400,
+                        maxHeight: Dimensions.get('window').height * 0.8,
+                        minHeight: Dimensions.get('window').height * 0.6,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: 0.3,
@@ -173,40 +175,47 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
                         </Text>
                     </View>
 
-                    {/* Warning */}
-                    <View
-                        style={{
-                            backgroundColor: isDark ? COLORS.warningDark + '20' : COLORS.warning + '20',
-                            padding: 16,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDark ? COLORS.warning : COLORS.warningDark,
-                            marginBottom: 20,
-                        }}
+                    {/* Content - Scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
                     >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <AlertTriangle size={16} color={isDark ? COLORS.warning : COLORS.warningDark} />
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    fontWeight: '600',
-                                    color: isDark ? COLORS.warning : COLORS.warningDark,
-                                    marginLeft: 6,
-                                }}
-                            >
-                                Warning
-                            </Text>
-                        </View>
-                        <Text
+                        {/* Warning */}
+                        <View
                             style={{
-                                fontSize: 12,
-                                color: isDark ? COLORS.warning : COLORS.warningDark,
-                                lineHeight: 16,
+                                backgroundColor: isDark ? COLORS.warningDark + '20' : COLORS.warning + '20',
+                                padding: 16,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isDark ? COLORS.warning : COLORS.warningDark,
+                                marginBottom: 20,
                             }}
                         >
-                            Importing will replace all existing data. Make sure to export your current data first if you want to keep it.
-                        </Text>
-                    </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <AlertTriangle size={16} color={isDark ? COLORS.warning : COLORS.warningDark} />
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.warning : COLORS.warningDark,
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    Warning
+                                </Text>
+                            </View>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.warning : COLORS.warningDark,
+                                    lineHeight: 16,
+                                }}
+                            >
+                                Importing will replace all existing data. Make sure to export your current data first if you want to keep it.
+                            </Text>
+                        </View>
+                    </ScrollView>
 
                     {/* Import Button */}
                     <View style={{ gap: 12 }}>
@@ -297,6 +306,8 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
                         padding: 20,
                         width: '100%',
                         maxWidth: 400,
+                        maxHeight: Dimensions.get('window').height * 0.8,
+                        minHeight: Dimensions.get('window').height * 0.6,
                         shadowColor: isDark ? COLORS.primaryDark : COLORS.primary,
                         shadowOffset: { width: 0, height: 4 },
                         shadowOpacity: 0.3,
@@ -329,96 +340,103 @@ export const DataBackup: React.FC<DataBackupProps> = ({ onDataImported }) => {
                         </Text>
                     </View>
 
-                    {/* Data Summary */}
-                    <View
-                        style={{
-                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                            padding: 16,
-                            borderRadius: 8,
-                            marginBottom: 20,
-                        }}
+                    {/* Content - Scrollable */}
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={true}
+                        contentContainerStyle={{ paddingBottom: 20 }}
                     >
-                        <View style={{ gap: 8 }}>
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    fontWeight: '600',
-                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                }}
-                            >
-                                Data Summary:
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • {summary.totalWorkouts} workouts
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • {summary.totalPRs} personal records
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 12,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                }}
-                            >
-                                • Current progress: Cycle {summary.currentProgress.cycle}, Week {summary.currentProgress.week}
-                            </Text>
-                            {summary.oldestWorkout && (
+                        {/* Data Summary */}
+                        <View
+                            style={{
+                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                padding: 16,
+                                borderRadius: 8,
+                                marginBottom: 20,
+                            }}
+                        >
+                            <View style={{ gap: 8 }}>
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                    }}
+                                >
+                                    Data Summary:
+                                </Text>
                                 <Text
                                     style={{
                                         fontSize: 12,
                                         color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                     }}
                                 >
-                                    • Date range: {summary.oldestWorkout} to {summary.newestWorkout}
+                                    • {summary.totalWorkouts} workouts
                                 </Text>
-                            )}
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • {summary.totalPRs} personal records
+                                </Text>
+                                <Text
+                                    style={{
+                                        fontSize: 12,
+                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    }}
+                                >
+                                    • Current progress: Cycle {summary.currentProgress.cycle}, Week {summary.currentProgress.week}
+                                </Text>
+                                {summary.oldestWorkout && (
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                        }}
+                                    >
+                                        • Date range: {summary.oldestWorkout} to {summary.newestWorkout}
+                                    </Text>
+                                )}
+                            </View>
                         </View>
-                    </View>
 
-                    {/* Warning */}
-                    <View
-                        style={{
-                            backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
-                            padding: 16,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                            marginBottom: 20,
-                        }}
-                    >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                            <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    fontWeight: '600',
-                                    color: isDark ? COLORS.error : COLORS.errorDark,
-                                    marginLeft: 6,
-                                }}
-                            >
-                                Warning
-                            </Text>
-                        </View>
-                        <Text
+                        {/* Warning */}
+                        <View
                             style={{
-                                fontSize: 12,
-                                color: isDark ? COLORS.error : COLORS.errorDark,
-                                lineHeight: 16,
+                                backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20',
+                                padding: 16,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: isDark ? COLORS.error : COLORS.errorDark,
+                                marginBottom: 20,
                             }}
                         >
-                            This will replace all existing data. This action cannot be undone.
-                        </Text>
-                    </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                <AlertTriangle size={16} color={isDark ? COLORS.error : COLORS.errorDark} />
+                                <Text
+                                    style={{
+                                        fontSize: 14,
+                                        fontWeight: '600',
+                                        color: isDark ? COLORS.error : COLORS.errorDark,
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    Warning
+                                </Text>
+                            </View>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.error : COLORS.errorDark,
+                                    lineHeight: 16,
+                                }}
+                            >
+                                This will replace all existing data. This action cannot be undone.
+                            </Text>
+                        </View>
+                    </ScrollView>
 
                     {/* Buttons */}
                     <View style={{ gap: 12 }}>
