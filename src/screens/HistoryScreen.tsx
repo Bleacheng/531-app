@@ -6,10 +6,11 @@ import { Badge } from '../components/Badge';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { COLORS } from '../constants/colors';
+import { OneRMGraph } from '../components/OneRMGraph';
 
 export const HistoryScreen: React.FC = () => {
     const { theme } = useTheme();
-    const { formatWeight, saveScrollPosition, getScrollPosition } = useSettings();
+    const { formatWeight, saveScrollPosition, getScrollPosition, oneRepMax, unit, workoutHistory } = useSettings();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
 
@@ -21,36 +22,34 @@ export const HistoryScreen: React.FC = () => {
         }
     }, []);
 
+    // Filter completed workouts from actual workoutHistory
+    const completedWorkouts = Array.isArray(workoutHistory?.workouts)
+        ? workoutHistory.workouts.filter((w) => w.status === 'completed')
+        : [];
+
+    // Compute stats from actual data
+    const totalWorkouts = completedWorkouts.length;
+    // Try to get the latest cycle from completed workouts, fallback to 1
+    const currentCycle = completedWorkouts.length > 0 ? Math.max(...completedWorkouts.map(w => w.cycle)) : 1;
+
     const stats = [
         {
             title: 'Total Workouts',
-            value: '0',
+            value: totalWorkouts.toString(),
             icon: Calendar,
             color: COLORS.primary
         },
         {
             title: 'Current Cycle',
-            value: 'Not Started',
+            value: totalWorkouts > 0 ? `Cycle ${currentCycle}` : 'Not Started',
             icon: TrendingUp,
             color: COLORS.success
         },
-        {
-            title: 'Best Deadlift',
-            value: 'No Data',
-            icon: Target,
-            color: COLORS.warning
-        },
-        {
-            title: 'Training Max',
-            value: 'No Data',
-            icon: Dumbbell,
-            color: COLORS.error
-        },
     ];
 
-    const recentProgress: any[] = [];
-
-    const workoutHistory: any[] = [];
+    // Use the same oneRMData and unit as in HomeScreen for the graph
+    // (Assume oneRMData is available from context or compute it here)
+    const oneRMData: any[] = [];
 
     const getStatusColor = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -139,13 +138,13 @@ export const HistoryScreen: React.FC = () => {
                 </View>
             </Card>
 
-            {/* Recent Progress */}
+            {/* Recent Progress (Stats Graph) */}
             <Card
                 title="Recent Progress"
                 borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
             >
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                    <Target size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
+                    <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
                     <Text
                         style={{
                             color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
@@ -153,175 +152,63 @@ export const HistoryScreen: React.FC = () => {
                             fontSize: 14
                         }}
                     >
-                        Last 30 days
+                        1RM Progress
                     </Text>
                 </View>
-                <View style={{ gap: 12 }}>
-                    {recentProgress.length > 0 ? (
-                        recentProgress.map((item, index) => (
-                            <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text
-                                        style={{
-                                            fontSize: 16,
-                                            color: isDark ? COLORS.textDark : COLORS.text,
-                                            fontWeight: '500'
-                                        }}
-                                    >
-                                        {item.exercise}
-                                    </Text>
-                                    <Text
-                                        style={{
-                                            fontSize: 14,
-                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
-                                        }}
-                                    >
-                                        {formatWeight(item.current)} (was {formatWeight(item.previous)})
-                                    </Text>
-                                </View>
-                                <Badge
-                                    label={item.change > 0 ? `+${item.change} kg` : item.change < 0 ? `${item.change} kg` : '0 kg'}
-                                    variant={item.status}
-                                />
-                            </View>
-                        ))
-                    ) : (
-                        <View style={{
-                            padding: 20,
-                            alignItems: 'center',
-                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                        }}>
-                            <Target size={24} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                            <Text
-                                style={{
-                                    fontSize: 16,
-                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                    fontWeight: '500',
-                                    marginTop: 8,
-                                    textAlign: 'center'
-                                }}
-                            >
-                                No Progress Data
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    textAlign: 'center',
-                                    marginTop: 4
-                                }}
-                            >
-                                Complete your first workout to see progress here
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                <OneRMGraph data={oneRMData} unit={unit} />
             </Card>
 
-            {/* Workout History */}
+            {/* Workout History - Only show completed workouts */}
             <Card
                 title="Workout History"
-                borderColor={isDark ? COLORS.successLight : COLORS.success}
+                borderColor={isDark ? COLORS.secondaryLight : COLORS.secondary}
             >
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                    <History size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                    <Text
-                        style={{
-                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                            marginLeft: 8,
-                            fontSize: 14
-                        }}
-                    >
-                        Recent workouts
-                    </Text>
-                </View>
-                <View style={{ gap: 12 }}>
-                    {workoutHistory.length > 0 ? (
-                        workoutHistory.map((workout, index) => (
+                {completedWorkouts.length === 0 ? (
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 16 }}>
+                            No completed workouts yet.
+                        </Text>
+                    </View>
+                ) : (
+                    <View>
+                        {completedWorkouts.map((w, i) => (
                             <View
-                                key={index}
+                                key={i}
                                 style={{
+                                    marginBottom: 14,
+                                    padding: 14,
+                                    borderRadius: 10,
                                     backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                                    padding: 12,
-                                    borderRadius: 8,
                                     borderWidth: 1,
                                     borderColor: isDark ? COLORS.borderDark : COLORS.border,
                                 }}
                             >
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                    <Text
-                                        style={{
-                                            fontSize: 16,
-                                            fontWeight: 'bold',
-                                            color: isDark ? COLORS.textDark : COLORS.text
-                                        }}
-                                    >
-                                        {workout.workout}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                    <Badge label={w.exercise.charAt(0).toUpperCase() + w.exercise.slice(1)} variant="success" />
+                                    <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontWeight: 'bold', fontSize: 16, marginLeft: 8 }}>
+                                        Cycle {w.cycle}, Week {w.week}
                                     </Text>
-                                    <Badge
-                                        label={workout.date}
-                                        variant="complementary"
-                                    />
+                                    {w.failed === true && (
+                                        <View style={{ marginLeft: 8 }}>
+                                            <Badge label="Failed" variant="error" size="small" />
+                                        </View>
+                                    )}
+                                    {w.failed === false && (
+                                        <View style={{ marginLeft: 8 }}>
+                                            <Badge label="Passed" variant="success" size="small" />
+                                        </View>
+                                    )}
                                 </View>
-                                <Text
-                                    style={{
-                                        fontSize: 14,
-                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                        marginBottom: 4
-                                    }}
-                                >
-                                    {workout.exercises.join(' • ')}
+                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 14, marginBottom: 2 }}>
+                                    Completed: {w.completedDate ? new Date(w.completedDate).toLocaleDateString() : '—'}
                                 </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <Text
-                                        style={{
-                                            fontSize: 12,
-                                            color: getStatusColor(workout.status),
-                                            fontWeight: '500'
-                                        }}
-                                    >
-                                        ✓ Completed
-                                    </Text>
-                                </View>
+                                <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 15 }}>
+                                    Weight: {w.weight && !isNaN(Number(w.weight)) ? formatWeight(Number(w.weight)) : (w.weight || '—')} | Reps: {w.reps ?? '—'}
+                                </Text>
                             </View>
-                        ))
-                    ) : (
-                        <View style={{
-                            padding: 20,
-                            alignItems: 'center',
-                            backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDark ? COLORS.borderDark : COLORS.border,
-                        }}>
-                            <History size={24} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                            <Text
-                                style={{
-                                    fontSize: 16,
-                                    color: isDark ? COLORS.textDark : COLORS.text,
-                                    fontWeight: '500',
-                                    marginTop: 8,
-                                    textAlign: 'center'
-                                }}
-                            >
-                                No Workout History
-                            </Text>
-                            <Text
-                                style={{
-                                    fontSize: 14,
-                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                    textAlign: 'center',
-                                    marginTop: 4
-                                }}
-                            >
-                                Complete your first workout to see history here
-                            </Text>
-                        </View>
-                    )}
-                </View>
+                        ))}
+                    </View>
+                )}
             </Card>
         </ScrollView>
     );

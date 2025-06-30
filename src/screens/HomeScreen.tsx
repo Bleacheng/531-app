@@ -116,7 +116,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                     sets.push({
                         weight: formatWeight(weight),
                         reps: warmupSets.set1.reps,
-                        amrap: false
+                        amrap: false,
+                        type: 'warmup'
                     });
                 }
                 if (warmupSets.set2.percentage > 0) {
@@ -124,7 +125,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                     sets.push({
                         weight: formatWeight(weight),
                         reps: warmupSets.set2.reps,
-                        amrap: false
+                        amrap: false,
+                        type: 'warmup'
                     });
                 }
                 if (warmupSets.set3.percentage > 0) {
@@ -132,7 +134,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                     sets.push({
                         weight: formatWeight(weight),
                         reps: warmupSets.set3.reps,
-                        amrap: false
+                        amrap: false,
+                        type: 'warmup'
                     });
                 }
             }
@@ -148,7 +151,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                 sets.push({
                     weight: formatWeight(weight),
                     reps: isAmrap ? 5 : 5, // Will show as 5+ for AMRAP
-                    amrap: isAmrap
+                    amrap: isAmrap,
+                    type: 'working'
                 });
             }
 
@@ -159,7 +163,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                     sets.push({
                         weight: formatWeight(bbbWeight),
                         reps: 10,
-                        amrap: false
+                        amrap: false,
+                        type: 'bbb'
                     });
                 }
             }
@@ -705,16 +710,15 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                 reps = parseInt(setStates[amrapSetIndex].repsCompleted) || 0;
             }
 
-            // Check if the workout was successful (AMRAP set completed with sufficient reps)
-            const isSuccessful = reps > 0 && (currentWeek === 4 ? reps >= 3 : reps >= 5);
-
-            if (isSuccessful) {
-                const weight = calculateWorkoutWeight(workoutSession.exerciseKey as keyof typeof oneRepMax, currentWeek, 3);
-                completeWorkout(workoutSession.exerciseKey as keyof typeof oneRepMax, currentCycle, currentWeek, reps, formatWeight(weight));
-            } else {
-                // Mark as missed if AMRAP set failed
-                markWorkoutAsMissed(workoutSession.exerciseKey as keyof typeof oneRepMax, currentCycle, currentWeek);
-            }
+            // Always mark as completed, even if some sets are failed
+            const weight = calculateWorkoutWeight(workoutSession.exerciseKey as keyof typeof oneRepMax, currentWeek, 3);
+            completeWorkout(
+                workoutSession.exerciseKey as keyof typeof oneRepMax,
+                currentCycle,
+                currentWeek,
+                reps,
+                formatWeight(weight)
+            );
 
             // Close workout session
             discardWorkoutSession();
@@ -1674,11 +1678,11 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                                 <Text
                                                                     style={{
                                                                         fontSize: 12,
-                                                                        color: isDark ? COLORS.error : COLORS.errorDark,
+                                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
                                                                         fontWeight: '500',
                                                                     }}
                                                                 >
-                                                                    ✗ Missed
+                                                                    ? Missed
                                                                 </Text>
                                                                 <TouchableOpacity
                                                                     onPress={() => {
@@ -1802,21 +1806,26 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                                     style={{
                                                                         fontSize: 12,
                                                                         color: COLORS.success,
-                                                                        fontWeight: '500'
+                                                                        fontWeight: '500',
                                                                     }}
                                                                 >
                                                                     ✓ Completed
                                                                 </Text>
                                                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                                                     {lift.reps !== null && (
+                                                                        (lift.week === 4 ? lift.reps < 3 : lift.reps < 5)
+                                                                            ? <Text style={{ fontSize: 12, color: COLORS.error, fontWeight: '600' }}>✗ Failed</Text>
+                                                                            : <Text style={{ fontSize: 12, color: COLORS.success, fontWeight: '600' }}>✓ Passed</Text>
+                                                                    )}
+                                                                    {lift.reps !== null && (
                                                                         <Text
                                                                             style={{
                                                                                 fontSize: 12,
                                                                                 color: (lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? COLORS.error : COLORS.success,
-                                                                                fontWeight: '500'
+                                                                                fontWeight: '600',
                                                                             }}
                                                                         >
-                                                                            {(lift.week === 4 ? lift.reps < 3 : lift.reps < 5) ? '✗ Failed' : '✓ Passed'}
+                                                                            {lift.reps}
                                                                         </Text>
                                                                     )}
                                                                     <TouchableOpacity
@@ -1967,10 +1976,10 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                             </Text>
                                                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                                                 {exerciseStatus === 'completed' && (
-                                                                    <CheckCircle size={12} color={COLORS.success} />
+                                                                    <Text style={{ fontSize: 12, color: COLORS.success, fontWeight: '600' }}>✓ Passed</Text>
                                                                 )}
                                                                 {exerciseStatus === 'failed' && (
-                                                                    <X size={12} color={COLORS.error} />
+                                                                    <Text style={{ fontSize: 12, color: COLORS.error, fontWeight: '600' }}>✗ Failed</Text>
                                                                 )}
                                                                 <Text
                                                                     style={{
@@ -2009,29 +2018,6 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                         </View>
                                     ))}
                                 </View>
-                            </Card>
-                        )}
-
-                        {/* Statistics - Only show when onboarding is complete */}
-                        {!isOnboardingNeeded() && (
-                            <Card
-                                title="Statistics"
-                                borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
-                            >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                                    <TrendingUp size={16} color={isDark ? COLORS.textSecondaryDark : COLORS.textSecondary} />
-                                    <Text
-                                        style={{
-                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
-                                            marginLeft: 8,
-                                            fontSize: 16
-                                        }}
-                                    >
-                                        1RM Progress
-                                    </Text>
-                                </View>
-
-                                <OneRMGraph data={oneRMData} unit={unit} />
                             </Card>
                         )}
                     </ScrollView>

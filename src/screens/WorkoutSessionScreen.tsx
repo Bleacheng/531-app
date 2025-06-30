@@ -4,6 +4,7 @@ import { Card } from '../components/Card';
 import { X, CheckCircle } from 'lucide-react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { COLORS } from '../constants/colors';
+import { Badge } from '../components/Badge';
 
 // Set type: { weight: string|number, reps: string|number, amrap?: boolean }
 const WorkoutSessionScreen = ({
@@ -27,14 +28,24 @@ const WorkoutSessionScreen = ({
     const [submitting, setSubmitting] = useState(false);
 
     const handleSet = (idx, status) => {
-        setSetStates(prev => prev.map((s, i) => i === idx ? { ...s, status } : s));
+        setSetStates(prev => prev.map((s, i) => {
+            if (i !== idx) return s;
+            // If already selected, undo
+            if (s.status === status) return { ...s, status: null };
+            return { ...s, status };
+        }));
     };
     const handleRepsChange = (idx, val) => {
         setSetStates(prev => prev.map((s, i) => i === idx ? { ...s, repsCompleted: val.replace(/[^0-9]/g, '') } : s));
     };
 
     const canFinish = setStates.every((s, i) => {
-        if (sets[i].amrap) return s.status === 'success' && s.repsCompleted && parseInt(s.repsCompleted) > 0;
+        if (sets[i].amrap) {
+            if (s.status === 'success') {
+                return s.repsCompleted && parseInt(s.repsCompleted) > 0;
+            }
+            return s.status === 'fail';
+        }
         return s.status !== null;
     });
 
@@ -54,19 +65,25 @@ const WorkoutSessionScreen = ({
         <View style={{ flex: 1, backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background }}>
             <ScrollView contentContainerStyle={{ padding: 16, flexGrow: 1 }}>
                 <Card
-                    title={weekName}
+                    title={`${exerciseName} - ${weekName}`}
                     borderColor={isDark ? COLORS.primaryLight : COLORS.primary}
                     backgroundColor={isDark ? COLORS.backgroundSecondaryDark : COLORS.backgroundSecondary}
+                    style={{ width: '95%', alignSelf: 'center' }}
                 >
-                    <View style={{ gap: 16, maxWidth: 500, alignSelf: 'center', width: '100%' }}>
+                    <View style={{ gap: 16, width: '100%' }}>
                         {sets.map((set, idx) => (
                             <View key={idx} style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
                                 borderRadius: 12,
-                                borderWidth: 1,
-                                borderColor: setStates[idx].status === 'success' ? COLORS.success : setStates[idx].status === 'fail' ? COLORS.error : (isDark ? COLORS.borderDark : COLORS.border),
+                                borderWidth: 2,
+                                borderColor:
+                                    setStates[idx].status === 'success'
+                                        ? (isDark ? COLORS.successDark : COLORS.success)
+                                        : setStates[idx].status === 'fail'
+                                            ? (isDark ? COLORS.errorDark : COLORS.error)
+                                            : (isDark ? COLORS.borderDark : COLORS.border),
                                 padding: 20,
                                 gap: 12,
                                 minHeight: 80,
@@ -76,20 +93,30 @@ const WorkoutSessionScreen = ({
                                 <TouchableOpacity
                                     onPress={() => handleSet(idx, 'fail')}
                                     style={{
-                                        backgroundColor: COLORS.error + '20',
+                                        backgroundColor: isDark ? COLORS.errorDark : COLORS.error,
                                         borderRadius: 10,
                                         padding: 12,
                                         marginRight: 12,
                                         opacity: setStates[idx].status === 'success' ? 0.5 : 1,
                                     }}
-                                    disabled={setStates[idx].status === 'success'}
+                                    disabled={false}
                                 >
-                                    <X size={28} color={COLORS.error} />
+                                    <X size={28} color={'white'} />
                                 </TouchableOpacity>
                                 {/* Set info */}
                                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                                    <Text style={{ fontWeight: '700', color: isDark ? COLORS.textDark : COLORS.text, fontSize: 18, marginBottom: 2 }}>{`Set ${idx + 1}`}</Text>
-                                    <Text style={{ color: isDark ? COLORS.text : COLORS.textDark, fontSize: 22, fontWeight: 'bold', marginBottom: set.amrap ? 6 : 0 }}>
+                                    {/* Set type badge */}
+                                    {set.type === 'warmup' && (
+                                        <Badge label="Warmup" variant="secondary" size="small" />
+                                    )}
+                                    {set.type === 'working' && (
+                                        <Badge label="Working" variant="primary" size="small" />
+                                    )}
+                                    {set.type === 'bbb' && (
+                                        <Badge label="BBB" variant="complementary" size="small" />
+                                    )}
+                                    <Text style={{ fontWeight: '700', color: isDark ? COLORS.textDark : COLORS.text, fontSize: 14, marginBottom: 2, marginTop: 4 }}>{`Set ${idx + 1}`}</Text>
+                                    <Text style={{ color: isDark ? COLORS.textDark : COLORS.text, fontSize: 16, fontWeight: 'bold', marginBottom: set.amrap ? 6 : 0 }}>
                                         {set.weight} × {set.reps}{set.amrap ? '+' : ''}
                                     </Text>
                                     {set.amrap && (
@@ -107,7 +134,7 @@ const WorkoutSessionScreen = ({
                                                 backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background,
                                                 width: 100,
                                                 textAlign: 'center',
-                                                fontSize: 18,
+                                                fontSize: 16,
                                                 marginTop: 6,
                                             }}
                                             editable={setStates[idx].status !== 'fail'}
@@ -118,15 +145,15 @@ const WorkoutSessionScreen = ({
                                 <TouchableOpacity
                                     onPress={() => handleSet(idx, 'success')}
                                     style={{
-                                        backgroundColor: COLORS.success + '20',
+                                        backgroundColor: isDark ? COLORS.successDark : COLORS.success,
                                         borderRadius: 10,
                                         padding: 12,
                                         marginLeft: 12,
                                         opacity: setStates[idx].status === 'fail' || (set.amrap && (!setStates[idx].repsCompleted || parseInt(setStates[idx].repsCompleted) <= 0)) ? 0.5 : 1,
                                     }}
-                                    disabled={setStates[idx].status === 'fail' || (set.amrap && (!setStates[idx].repsCompleted || parseInt(setStates[idx].repsCompleted) <= 0))}
+                                    disabled={set.amrap && (!setStates[idx].repsCompleted || parseInt(setStates[idx].repsCompleted) <= 0)}
                                 >
-                                    <CheckCircle size={28} color={COLORS.success} />
+                                    <CheckCircle size={28} color={'white'} />
                                 </TouchableOpacity>
                             </View>
                         ))}

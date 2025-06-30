@@ -83,6 +83,7 @@ interface WorkoutStatus {
     completedDate?: string; // ISO date string when completed
     reps?: number; // Reps achieved on final set
     weight?: string; // Weight used
+    failed: boolean;
 }
 
 interface WorkoutHistory {
@@ -751,7 +752,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             status: 'completed',
             completedDate: today,
             reps,
-            weight
+            weight,
+            failed: isFailed
         };
 
         let newWorkouts = [...workoutHistory.workouts];
@@ -786,7 +788,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             cycle,
             week,
             scheduledDate: scheduledDate || today,
-            status: 'missed'
+            status: 'missed',
+            failed: false
         };
 
         let newWorkouts = [...workoutHistory.workouts];
@@ -896,7 +899,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
                 cycle,
                 week,
                 scheduledDate: completedWorkout.scheduledDate,
-                status
+                status,
+                failed: false
             };
 
             let newWorkouts = [...workoutHistory.workouts];
