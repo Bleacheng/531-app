@@ -378,51 +378,56 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
             const weekStartDate = getNextDayOccurrence(firstWorkoutDay, new Date());
             weekStartDate.setDate(weekStartDate.getDate() + (week - 1) * 7);
 
-            const lifts = Object.entries(workoutSchedule).map(([exercise, day]) => {
-                const exerciseName = exerciseNames[exercise as keyof typeof exerciseNames];
-                const topSet = week === 4 ? '3×5' : '1×5+';
+            // Create lifts array and sort by day of week
+            const lifts = Object.entries(workoutSchedule)
+                .filter(([_, day]) => day !== '') // Only include exercises with scheduled days
+                .map(([exercise, day]) => {
+                    const exerciseName = exerciseNames[exercise as keyof typeof exerciseNames];
+                    const topSet = week === 4 ? '3×5' : '1×5+';
 
-                let weight: string;
-                if (week === 4) {
-                    // Deload week uses 40%, 50%, 60%
-                    const deloadWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, 4, 3);
-                    weight = formatWeight(deloadWeight);
-                } else {
-                    // Regular weeks use the top set percentage
-                    const topSetWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, week, 3);
-                    weight = formatWeight(topSetWeight);
-                }
+                    let weight: string;
+                    if (week === 4) {
+                        // Deload week uses 40%, 50%, 60%
+                        const deloadWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, 4, 3);
+                        weight = formatWeight(deloadWeight);
+                    } else {
+                        // Regular weeks use the top set percentage
+                        const topSetWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, week, 3);
+                        weight = formatWeight(topSetWeight);
+                    }
 
-                const scheduledDate = getNextDayOccurrence(day, weekStartDate);
-                const scheduledDateString = scheduledDate.toISOString().split('T')[0];
-                const isToday = scheduledDateString === today;
+                    const scheduledDate = getNextDayOccurrence(day, weekStartDate);
+                    const scheduledDateString = scheduledDate.toISOString().split('T')[0];
+                    const isToday = scheduledDateString === today;
 
-                // Get workout status
-                const workoutStatus = getWorkoutStatus(exercise as keyof typeof workoutSchedule, currentCycle, week);
-                let status: 'upcoming' | 'today' | 'completed' | 'missed' = 'upcoming';
-                let reps: number | null = null;
-                let passed: boolean | null = null;
+                    // Get workout status
+                    const workoutStatus = getWorkoutStatus(exercise as keyof typeof workoutSchedule, currentCycle, week);
+                    let status: 'upcoming' | 'today' | 'completed' | 'missed' = 'upcoming';
+                    let reps: number | null = null;
+                    let passed: boolean | null = null;
 
-                if (workoutStatus) {
-                    status = workoutStatus.status;
-                    reps = workoutStatus.reps || null;
-                    passed = reps !== null && reps > 0; // Simple pass/fail logic
-                } else if (isToday) {
-                    status = 'today';
-                }
+                    if (workoutStatus) {
+                        status = workoutStatus.status;
+                        reps = workoutStatus.reps || null;
+                        passed = reps !== null && reps > 0; // Simple pass/fail logic
+                    } else if (isToday) {
+                        status = 'today';
+                    }
 
-                return {
-                    lift: exerciseName,
-                    topSet,
-                    weight,
-                    reps,
-                    passed,
-                    scheduledDay: day,
-                    scheduledDate,
-                    status,
-                    exercise: exercise as keyof typeof workoutSchedule
-                };
-            });
+                    return {
+                        lift: exerciseName,
+                        topSet,
+                        weight,
+                        reps,
+                        passed,
+                        scheduledDay: day,
+                        scheduledDate,
+                        status,
+                        exercise: exercise as keyof typeof workoutSchedule,
+                        dayOrder: getDayOrder(day) // Add day order for sorting
+                    };
+                })
+                .sort((a, b) => a.dayOrder - b.dayOrder); // Sort by day of week
 
             cycleData.push({
                 week,
@@ -448,35 +453,39 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                 const weekStartDate = getNextDayOccurrence(firstWorkoutDay, new Date());
                 weekStartDate.setDate(weekStartDate.getDate() + (week - 1) * 7 + 28); // +28 for next cycle
 
-                const lifts = Object.entries(workoutSchedule).map(([exercise, day]) => {
-                    const exerciseName = exerciseNames[exercise as keyof typeof exerciseNames];
-                    const topSet = week === 4 ? '3×5' : '1×5+';
+                const lifts = Object.entries(workoutSchedule)
+                    .filter(([_, day]) => day !== '') // Only include exercises with scheduled days
+                    .map(([exercise, day]) => {
+                        const exerciseName = exerciseNames[exercise as keyof typeof exerciseNames];
+                        const topSet = week === 4 ? '3×5' : '1×5+';
 
-                    let weight: string;
-                    if (week === 4) {
-                        const deloadWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, 4, 3);
-                        weight = formatWeight(deloadWeight);
-                    } else {
-                        const topSetWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, week, 3);
-                        weight = formatWeight(topSetWeight);
-                    }
+                        let weight: string;
+                        if (week === 4) {
+                            const deloadWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, 4, 3);
+                            weight = formatWeight(deloadWeight);
+                        } else {
+                            const topSetWeight = calculateWorkoutWeight(exercise as keyof typeof oneRepMax, week, 3);
+                            weight = formatWeight(topSetWeight);
+                        }
 
-                    const scheduledDate = getNextDayOccurrence(day, weekStartDate);
-                    const scheduledDateString = scheduledDate.toISOString().split('T')[0];
-                    const isToday = scheduledDateString === today;
+                        const scheduledDate = getNextDayOccurrence(day, weekStartDate);
+                        const scheduledDateString = scheduledDate.toISOString().split('T')[0];
+                        const isToday = scheduledDateString === today;
 
-                    return {
-                        lift: exerciseName,
-                        topSet,
-                        weight,
-                        reps: null,
-                        passed: null,
-                        scheduledDay: day,
-                        scheduledDate,
-                        status: isToday ? 'today' : 'upcoming' as const,
-                        exercise: exercise as keyof typeof workoutSchedule
-                    };
-                });
+                        return {
+                            lift: exerciseName,
+                            topSet,
+                            weight,
+                            reps: null,
+                            passed: null,
+                            scheduledDay: day,
+                            scheduledDate,
+                            status: isToday ? 'today' : 'upcoming' as const,
+                            exercise: exercise as keyof typeof workoutSchedule,
+                            dayOrder: getDayOrder(day) // Add day order for sorting
+                        };
+                    })
+                    .sort((a, b) => a.dayOrder - b.dayOrder); // Sort by day of week
 
                 cycleData.push({
                     week,
@@ -491,6 +500,15 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
         return cycleData;
     }, [currentCycle, currentWeek, workoutSchedule, oneRepMax, exerciseProgression, trainingMaxPercentage, workingSetPercentages, isOnboardingNeeded, workoutHistory]);
+
+    // Helper function to get day order for sorting
+    const getDayOrder = (dayName: string): number => {
+        const dayMap: { [key: string]: number } = {
+            'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
+            'Friday': 5, 'Saturday': 6, 'Sunday': 7
+        };
+        return dayMap[dayName] || 0;
+    };
 
     const getStatusIcon = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -530,6 +548,23 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         if (diffDays === 1) return 'Yesterday';
         if (diffDays < 7) return `${diffDays} days ago`;
 
+        // For dates more than a week away, show the actual date
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
+    // Format date for badge display
+    const formatDateForBadge = (date: Date) => {
+        const diffTime = Math.abs(today.getTime() - date.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Tomorrow';
+        if (diffDays < 7) return `${diffDays} days`;
+
         return date.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric'
@@ -550,6 +585,37 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
     return (
         <>
+            <Modal
+                isVisible={onboardingVisible}
+                onBackdropPress={() => setOnboardingVisible(false)}
+                style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
+                backdropOpacity={0.5}
+                useNativeDriver={true}
+                hideModalContentWhileAnimating={true}
+                statusBarTranslucent={true}
+            >
+                <View style={{ backgroundColor: isDark ? COLORS.backgroundDark : COLORS.background, borderRadius: 12, padding: 20, width: '100%', maxWidth: 400 }}>
+                    <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
+                        {getStepTitle(currentStep)}
+                    </Text>
+                    <Text style={{ fontSize: 14, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 20 }}>
+                        {getStepDescription(currentStep)}
+                    </Text>
+                    {/* Render step-specific content here (inputs, selectors, etc.) */}
+                    {/* ... (existing onboarding step content goes here) ... */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 }}>
+                        <Button onPress={handleOnboardingBack} variant="outline" disabled={currentStep === 0} style={{ flex: 1, marginRight: 8 }}>
+                            Back
+                        </Button>
+                        <Button onPress={handleOnboardingNext} variant="primary" style={{ flex: 1, marginLeft: 8 }}>
+                            {currentStep < 3 ? 'Next' : 'Finish'}
+                        </Button>
+                    </View>
+                    <Button onPress={() => setOnboardingVisible(false)} variant="outline" style={{ marginTop: 16 }}>
+                        Cancel
+                    </Button>
+                </View>
+            </Modal>
             <ScrollView
                 ref={scrollViewRef}
                 style={{
@@ -747,11 +813,26 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                             {lift.lift}
                                                         </Text>
                                                         <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDate(lift.scheduledDate)}`}
+                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
                                                             variant="primary"
                                                         />
                                                     </View>
                                                     <View style={{ marginBottom: 12 }}>
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 14,
+                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                marginBottom: 4
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                weekday: 'long',
+                                                                year: 'numeric',
+                                                                month: 'long',
+                                                                day: 'numeric'
+                                                            })}
+                                                        </Text>
                                                         <Text
                                                             style={{
                                                                 fontSize: 14,
@@ -816,11 +897,26 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                             {lift.lift}
                                                         </Text>
                                                         <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDate(lift.scheduledDate)}`}
+                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
                                                             variant="complementary"
                                                         />
                                                     </View>
                                                     <View style={{ marginBottom: 12 }}>
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 14,
+                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                marginBottom: 4
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                weekday: 'long',
+                                                                year: 'numeric',
+                                                                month: 'long',
+                                                                day: 'numeric'
+                                                            })}
+                                                        </Text>
                                                         <Text
                                                             style={{
                                                                 fontSize: 14,
@@ -886,11 +982,26 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                             {lift.lift}
                                                         </Text>
                                                         <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDate(lift.scheduledDate)}`}
+                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
                                                             variant="error"
                                                         />
                                                     </View>
                                                     <View style={{ marginBottom: 12 }}>
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 14,
+                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                marginBottom: 4
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                weekday: 'long',
+                                                                year: 'numeric',
+                                                                month: 'long',
+                                                                day: 'numeric'
+                                                            })}
+                                                        </Text>
                                                         <Text
                                                             style={{
                                                                 fontSize: 14,
@@ -950,11 +1061,26 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                             {lift.lift}
                                                         </Text>
                                                         <Badge
-                                                            label={`${lift.scheduledDay} - ${formatDate(lift.scheduledDate)}`}
+                                                            label={`${lift.scheduledDay} - ${formatDateForBadge(lift.scheduledDate)}`}
                                                             variant="success"
                                                         />
                                                     </View>
                                                     <View style={{ marginBottom: 12 }}>
+                                                        <Text
+                                                            style={{
+                                                                fontSize: 14,
+                                                                color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                                marginBottom: 4
+                                                            }}
+                                                        >
+                                                            <Text style={{ fontWeight: '600' }}>Date: </Text>
+                                                            {lift.scheduledDate.toLocaleDateString('en-US', {
+                                                                weekday: 'long',
+                                                                year: 'numeric',
+                                                                month: 'long',
+                                                                day: 'numeric'
+                                                            })}
+                                                        </Text>
                                                         <Text
                                                             style={{
                                                                 fontSize: 14,

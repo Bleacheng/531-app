@@ -35,3 +35,21 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# android
+android/
+
+# vscode
+.vscode/
+
+# ios
+ios/
+
+# log files
+*.log
+
+# coverage
+coverage/
+
+# iml files
+*.iml
