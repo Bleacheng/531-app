@@ -40,7 +40,10 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         setUnit,
         trainingMaxDecreases,
         resetTrainingMaxDecreases,
-        undoWorkout
+        undoWorkout,
+        bbbSettings,
+        updateBbbEnabled,
+        updateBbbPercentage
     } = useSettings();
     const isDark = theme === 'dark';
     const scrollViewRef = useRef<ScrollView>(null);
@@ -60,6 +63,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         oneRmWeight: Record<Exercise, string>;
         oneRmReps: Record<Exercise, string>;
         trainingMaxPercentage: string;
+        bbbVariant: 'none' | 'bbb';
+        bbbPercentage: string;
     }
 
     // 2. Update onboardingData state to use new structure
@@ -70,6 +75,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         oneRmWeight: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
         oneRmReps: { benchPress: '', squat: '', deadlift: '', overheadPress: '' },
         trainingMaxPercentage: '90',
+        bbbVariant: 'none',
+        bbbPercentage: '50',
     });
 
     // Day selector modal state (like in settings)
@@ -160,27 +167,22 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         setSelectedExercise(null);
     };
 
-    // Onboarding functions
+    // Update step count
+    const totalSteps = 5;
+
+    // Update step navigation logic
     const handleOnboardingNext = () => {
-        // Validate current step before proceeding
         if (!isCurrentStepValid()) {
             return;
         }
-
-        if (currentStep < 3) {
+        if (currentStep < totalSteps - 1) {
             setCurrentStep(currentStep + 1);
         } else {
             handleCompleteOnboarding();
         }
     };
 
-    const handleOnboardingBack = () => {
-        if (currentStep > 0) {
-            setCurrentStep(currentStep - 1);
-        }
-    };
-
-    // Validation functions for each step
+    // Update validation logic
     const isCurrentStepValid = () => {
         switch (currentStep) {
             case 0: // Workout Schedule
@@ -199,54 +201,18 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                     !isNaN(parseFloat(onboardingData.trainingMaxPercentage)) &&
                     parseFloat(onboardingData.trainingMaxPercentage) >= 80 &&
                     parseFloat(onboardingData.trainingMaxPercentage) <= 100;
+            case 4: // BBB Settings
+                return onboardingData.bbbVariant === 'none' || (
+                    onboardingData.bbbVariant === 'bbb' &&
+                    onboardingData.bbbPercentage !== '' &&
+                    !isNaN(parseFloat(onboardingData.bbbPercentage)) &&
+                    parseFloat(onboardingData.bbbPercentage) >= 0 &&
+                    parseFloat(onboardingData.bbbPercentage) <= 100
+                );
             default:
                 return false;
         }
     };
-
-    const getStepValidationError = () => {
-        switch (currentStep) {
-            case 0: // Workout Schedule
-                if (!Object.values(onboardingData.workoutSchedule).every(day => day !== '')) {
-                    return 'Please select a day for all exercises';
-                }
-                if (Object.values(onboardingData.workoutSchedule).length !== new Set(Object.values(onboardingData.workoutSchedule)).size) {
-                    return 'Each exercise must be on a different day';
-                }
-                return null;
-            case 1: // Exercise Progression
-                const invalidProgression = Object.entries(onboardingData.exerciseProgression).find(([exercise, progression]) =>
-                    progression === '' || isNaN(parseFloat(progression)) || parseFloat(progression) <= 0
-                );
-                if (invalidProgression) {
-                    return `Please enter a valid progression for ${invalidProgression[0]}`;
-                }
-                return null;
-            case 2: // 1 Rep Max
-                const invalidWeight = Object.entries(onboardingData.oneRepMax).find(([exercise, weight]) =>
-                    weight === '' || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0
-                );
-                if (invalidWeight) {
-                    return `Please enter a valid 1RM for ${invalidWeight[0]}`;
-                }
-                return null;
-            case 3: // Training Max Percentage
-                if (onboardingData.trainingMaxPercentage === '') {
-                    return 'Please enter a training max percentage';
-                }
-                if (isNaN(parseFloat(onboardingData.trainingMaxPercentage))) {
-                    return 'Please enter a valid number';
-                }
-                const percentage = parseFloat(onboardingData.trainingMaxPercentage);
-                if (percentage < 80 || percentage > 100) {
-                    return 'Training max must be between 80% and 100%';
-                }
-                return null;
-            default:
-                return null;
-        }
-    };
-
     const handleCompleteOnboarding = async () => {
         // Save all the onboarding data
         Object.entries(onboardingData.workoutSchedule).forEach(([exercise, day]) => {
@@ -274,6 +240,13 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
         // Save unit
         setUnit(onboardingUnit);
+
+        // Save BBB settings
+        const bbbEnabled = onboardingData.bbbVariant === 'bbb';
+        updateBbbEnabled(bbbEnabled);
+        if (bbbEnabled && onboardingData.bbbPercentage) {
+            updateBbbPercentage(parseFloat(onboardingData.bbbPercentage));
+        }
 
         // Close modal and reset step
         setOnboardingVisible(false);
@@ -305,6 +278,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
             case 1: return 'Exercise Progression';
             case 2: return '1 Rep Max (1RM)';
             case 3: return 'Training Max Percentage';
+            case 4: return 'Big But Boring (BBB) Sets';
             default: return '';
         }
     };
@@ -315,6 +289,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
             case 1: return 'Set weight progression per cycle for each exercise';
             case 2: return 'Enter your current 1 rep max for each exercise';
             case 3: return 'Enter your training max percentage';
+            case 4: return 'Configure BBB sets';
             default: return '';
         }
     };
@@ -354,11 +329,17 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
     // Calculate workout weight for a specific week and exercise
     const calculateWorkoutWeight = (exercise: keyof typeof oneRepMax, week: number, set: 1 | 2 | 3): number => {
         const trainingMax = calculateTrainingMax(exercise, currentCycle);
-        const weekPercentages = workingSetPercentages[`week${week}` as keyof typeof workingSetPercentages];
-        const percentage = weekPercentages[`set${set}` as keyof typeof weekPercentages];
+        const weekKey = `week${week}` as keyof typeof workingSetPercentages;
+        const setKey = `set${set}` as keyof typeof workingSetPercentages[typeof weekKey];
+        const percentage = workingSetPercentages[weekKey][setKey];
+        return roundToNearest2_5((trainingMax * percentage) / 100);
+    };
 
-        const weight = (trainingMax * percentage) / 100;
-        return roundToNearest2_5(weight);
+    // Calculate BBB weight for an exercise
+    const calculateBBBWeight = (exercise: keyof typeof oneRepMax): number => {
+        if (!bbbSettings.enabled || bbbSettings.percentage <= 0) return 0;
+        const trainingMax = calculateTrainingMax(exercise, currentCycle);
+        return roundToNearest2_5((trainingMax * bbbSettings.percentage) / 100);
     };
 
     // Get next occurrence of a day of the week
@@ -434,6 +415,13 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                         weight = formatWeight(topSetWeight);
                     }
 
+                    // Calculate BBB weight if enabled
+                    let bbbWeight: string | null = null;
+                    if (bbbSettings.enabled && bbbSettings.percentage > 0 && week !== 4) { // No BBB in deload week
+                        const bbbWeightValue = calculateBBBWeight(exercise as keyof typeof oneRepMax);
+                        bbbWeight = formatWeight(bbbWeightValue);
+                    }
+
                     const scheduledDate = getNextDayOccurrence(day, weekStartDate);
                     const scheduledDateString = scheduledDate.toISOString().split('T')[0];
                     const isToday = scheduledDateString === today;
@@ -463,7 +451,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                         status,
                         exercise: exercise as keyof typeof workoutSchedule,
                         dayOrder: getDayOrder(day), // Add day order for sorting
-                        week // Add week number for pass/fail logic
+                        week,
+                        bbbWeight
                     };
                 })
                 .sort((a, b) => a.dayOrder - b.dayOrder); // Sort by day of week
@@ -506,6 +495,13 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                             weight = formatWeight(topSetWeight);
                         }
 
+                        // Calculate BBB weight if enabled
+                        let bbbWeight: string | null = null;
+                        if (bbbSettings.enabled && bbbSettings.percentage > 0 && week !== 4) { // No BBB in deload week
+                            const bbbWeightValue = calculateBBBWeight(exercise as keyof typeof oneRepMax);
+                            bbbWeight = formatWeight(bbbWeightValue);
+                        }
+
                         const scheduledDate = getNextDayOccurrence(day, weekStartDate);
                         const scheduledDateString = scheduledDate.toISOString().split('T')[0];
                         const isToday = scheduledDateString === today;
@@ -521,7 +517,8 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                             status: isToday ? 'today' : 'upcoming' as const,
                             exercise: exercise as keyof typeof workoutSchedule,
                             dayOrder: getDayOrder(day), // Add day order for sorting
-                            week // Add week number for pass/fail logic
+                            week,
+                            bbbWeight
                         };
                     })
                     .sort((a, b) => a.dayOrder - b.dayOrder); // Sort by day of week
@@ -538,7 +535,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
         }
 
         return cycleData;
-    }, [currentCycle, currentWeek, workoutSchedule, oneRepMax, exerciseProgression, trainingMaxPercentage, workingSetPercentages, isOnboardingNeeded, workoutHistory]);
+    }, [currentCycle, currentWeek, workoutSchedule, oneRepMax, exerciseProgression, trainingMaxPercentage, workingSetPercentages, isOnboardingNeeded, workoutHistory, bbbSettings]);
 
     const getStatusIcon = (status: 'completed' | 'current' | 'upcoming') => {
         switch (status) {
@@ -588,12 +585,17 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
 
     // Format date for badge display
     const formatDateForBadge = (date: Date) => {
-        const diffTime = Math.abs(today.getTime() - date.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        // Calculate the difference in days between today and the target date
+        const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const targetStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const diffTime = targetStart.getTime() - todayStart.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
         if (diffDays === 0) return 'Today';
         if (diffDays === 1) return 'Tomorrow';
-        if (diffDays < 7) return `${diffDays} days`;
+        if (diffDays === -1) return 'Yesterday';
+        if (diffDays > 0 && diffDays < 7) return `${diffDays} days`;
+        if (diffDays < 0 && diffDays > -7) return `${Math.abs(diffDays)} days ago`;
 
         return date.toLocaleDateString('en-US', {
             month: 'short',
@@ -659,7 +661,7 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                     >
                         {/* Step Indicator */}
                         <Text style={{ fontSize: 16, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, textAlign: 'center', marginBottom: 8 }}>
-                            Step {currentStep + 1} of 4
+                            Step {currentStep + 1} of {totalSteps}
                         </Text>
                         <Text style={{ fontSize: 20, fontWeight: 'bold', color: isDark ? COLORS.textDark : COLORS.text, textAlign: 'center', marginBottom: 12 }}>
                             {getStepTitle(currentStep)}
@@ -1001,14 +1003,146 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                 </View>
                             </View>
                         )}
+                        {currentStep === 4 && (
+                            <View style={{ gap: 12 }}>
+                                <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                    Assistance Work
+                                </Text>
+                                <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 14, marginBottom: 12 }}>
+                                    Choose your assistance work variant for the 5/3/1 program.
+                                </Text>
+
+                                {/* Variant Selector */}
+                                <View style={{ marginBottom: 16 }}>
+                                    <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 8 }}>
+                                        Select Variant
+                                    </Text>
+                                    <View style={{ gap: 8 }}>
+                                        <TouchableOpacity
+                                            onPress={() => setOnboardingData(prev => ({ ...prev, bbbVariant: 'none' }))}
+                                            style={{
+                                                backgroundColor: onboardingData.bbbVariant === 'none'
+                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                borderWidth: 1,
+                                                borderColor: onboardingData.bbbVariant === 'none'
+                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                    : (isDark ? COLORS.borderDark : COLORS.border),
+                                                borderRadius: 8,
+                                                padding: 16,
+                                                alignItems: 'center',
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 16,
+                                                    fontWeight: '600',
+                                                    color: onboardingData.bbbVariant === 'none'
+                                                        ? 'white'
+                                                        : (isDark ? COLORS.textDark : COLORS.text),
+                                                }}
+                                            >
+                                                Nothing
+                                            </Text>
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: onboardingData.bbbVariant === 'none'
+                                                        ? 'white'
+                                                        : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
+                                                    textAlign: 'center',
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                No assistance work
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={() => setOnboardingData(prev => ({ ...prev, bbbVariant: 'bbb' }))}
+                                            style={{
+                                                backgroundColor: onboardingData.bbbVariant === 'bbb'
+                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                    : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                                borderWidth: 1,
+                                                borderColor: onboardingData.bbbVariant === 'bbb'
+                                                    ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                    : (isDark ? COLORS.borderDark : COLORS.border),
+                                                borderRadius: 8,
+                                                padding: 16,
+                                                alignItems: 'center',
+                                            }}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text
+                                                style={{
+                                                    fontSize: 16,
+                                                    fontWeight: '600',
+                                                    color: onboardingData.bbbVariant === 'bbb'
+                                                        ? 'white'
+                                                        : (isDark ? COLORS.textDark : COLORS.text),
+                                                }}
+                                            >
+                                                Big But Boring (BBB)
+                                            </Text>
+                                            <Text
+                                                style={{
+                                                    fontSize: 12,
+                                                    color: onboardingData.bbbVariant === 'bbb'
+                                                        ? 'white'
+                                                        : (isDark ? COLORS.textSecondaryDark : COLORS.textSecondary),
+                                                    textAlign: 'center',
+                                                    marginTop: 4,
+                                                }}
+                                            >
+                                                5 sets of 10 reps at % of training max
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* BBB Percentage Field - Only show when BBB is selected */}
+                                {onboardingData.bbbVariant === 'bbb' && (
+                                    <View style={{ marginBottom: 8 }}>
+                                        <Text style={{ fontWeight: '600', color: isDark ? COLORS.textDark : COLORS.text, marginBottom: 4 }}>
+                                            BBB Percentage of Training Max
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <TextInput
+                                                style={{
+                                                    flex: 1,
+                                                    borderWidth: 1,
+                                                    borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                    borderRadius: 8,
+                                                    padding: 8,
+                                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                                    backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                }}
+                                                keyboardType="numeric"
+                                                value={onboardingData.bbbPercentage}
+                                                onChangeText={text => setOnboardingData(prev => ({ ...prev, bbbPercentage: text.replace(/[^0-9.]/g, '') }))}
+                                                placeholder="e.g. 50"
+                                            />
+                                            <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary }}>
+                                                %
+                                            </Text>
+                                        </View>
+                                        <Text style={{ color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 12 }}>
+                                            Enter a value between 0 and 100.
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
                     </ScrollView>
                     {/* Step Navigation */}
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 }}>
-                        <Button onPress={handleOnboardingBack} variant="outline" disabled={currentStep === 0} style={{ flex: 1, marginRight: 8 }}>
+                        <Button onPress={() => setCurrentStep(Math.max(currentStep - 1, 0))} variant="outline" disabled={currentStep === 0} style={{ flex: 1, marginRight: 8 }}>
                             Back
                         </Button>
                         <Button onPress={handleOnboardingNext} variant="primary" style={{ flex: 1, marginLeft: 8 }}>
-                            {currentStep < 3 ? 'Next' : 'Finish'}
+                            {currentStep < totalSteps - 1 ? 'Next' : 'Finish'}
                         </Button>
                     </View>
                     <Button onPress={() => setOnboardingVisible(false)} variant="outline" style={{ marginTop: 16 }}>
@@ -1241,6 +1375,16 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         >
                                                             Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
+                                                        {lift.bbbWeight && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                }}
+                                                            >
+                                                                BBB: {lift.bbbWeight} × 5 × 10
+                                                            </Text>
+                                                        )}
                                                     </View>
                                                     <Button
                                                         onPress={() => handleStartWorkout(lift.lift)}
@@ -1317,6 +1461,16 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         >
                                                             Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
+                                                        {lift.bbbWeight && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                }}
+                                                            >
+                                                                BBB: {lift.bbbWeight} × 5 × 10
+                                                            </Text>
+                                                        )}
                                                     </View>
                                                     <Button
                                                         onPress={() => handleStartWorkout(lift.lift)}
@@ -1393,6 +1547,16 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         >
                                                             Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
+                                                        {lift.bbbWeight && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                }}
+                                                            >
+                                                                BBB: {lift.bbbWeight} × 5 × 10
+                                                            </Text>
+                                                        )}
                                                     </View>
                                                     <Button
                                                         onPress={() => handleStartWorkout(lift.lift)}
@@ -1507,6 +1671,16 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         >
                                                             Top Set: {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
+                                                        {lift.bbbWeight && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                }}
+                                                            >
+                                                                BBB: {lift.bbbWeight} × 5 × 10
+                                                            </Text>
+                                                        )}
                                                         {lift.reps !== null && (
                                                             <Text
                                                                 style={{
@@ -1701,6 +1875,16 @@ export const HomeScreen: React.FC<{ onNavigate?: (screen: 'home' | 'profile' | '
                                                         >
                                                             {lift.weight} × {lift.topSet.replace(/^\d+×/, '')}
                                                         </Text>
+                                                        {lift.bbbWeight && (
+                                                            <Text
+                                                                style={{
+                                                                    fontSize: 14,
+                                                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary
+                                                                }}
+                                                            >
+                                                                BBB: {lift.bbbWeight} × 5 × 10
+                                                            </Text>
+                                                        )}
                                                         {workoutStatus && workoutStatus.reps !== null && (
                                                             <Text
                                                                 style={{

@@ -97,6 +97,18 @@ interface TrainingMaxDecreases {
     overheadPress: number;
 }
 
+// BBB settings
+interface BBBSettings {
+    enabled: boolean;
+    percentage: number; // Percentage of TM to use for BBB sets
+}
+
+// Variant settings
+interface VariantSettings {
+    variant: 'nothing' | 'bigButBoring';
+    bbbPercentage: number; // Percentage of TM to use for BBB sets
+}
+
 interface SettingsContextType {
     unit: Unit;
     setUnit: (unit: Unit) => void;
@@ -123,6 +135,15 @@ interface SettingsContextType {
     setWarmupSets: (warmupSets: WarmupSets) => void;
     updateWarmupSet: (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps', value: number) => void;
     toggleWarmupEnabled: () => void;
+    // Variant Settings
+    variantSettings: VariantSettings;
+    setVariantSettings: (settings: VariantSettings) => void;
+    updateVariant: (variant: 'nothing' | 'bigButBoring') => void;
+    updateBbbPercentage: (percentage: number) => void;
+    // BBB Settings
+    bbbSettings: BBBSettings;
+    setBbbSettings: (settings: BBBSettings) => void;
+    updateBbbEnabled: (enabled: boolean) => void;
     scrollPositions: ScrollPositions;
     saveScrollPosition: (screen: keyof ScrollPositions, position: number) => void;
     getScrollPosition: (screen: keyof ScrollPositions) => number;
@@ -135,6 +156,7 @@ interface SettingsContextType {
         exerciseProgression: boolean;
         oneRepMax: boolean;
         trainingMaxPercentage: boolean;
+        variantSettings: boolean;
     };
     getOnboardingProgress: () => number;
     // Cycle Management
@@ -151,8 +173,8 @@ interface SettingsContextType {
     };
     // Workout Status Management
     workoutHistory: WorkoutHistory;
-    completeWorkout: (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string) => void;
-    markWorkoutAsMissed: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => void;
+    completeWorkout: (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string, scheduledDate?: string) => void;
+    markWorkoutAsMissed: (exercise: keyof WorkoutSchedule, cycle: number, week: number, scheduledDate?: string) => void;
     getWorkoutStatus: (exercise: keyof WorkoutSchedule, cycle: number, week: number) => WorkoutStatus | null;
     updateWorkoutStatuses: () => void;
     // Training Max Decreases
@@ -189,6 +211,11 @@ const defaultOneRepMax: OneRepMax = {
 
 const defaultTrainingMaxPercentage: TrainingMaxPercentage = {
     percentage: 0,
+};
+
+const defaultVariantSettings: VariantSettings = {
+    variant: 'nothing',
+    bbbPercentage: 50, // Default 50% of TM for BBB sets
 };
 
 const defaultWorkingSetPercentages: WorkingSetPercentages = {
@@ -269,6 +296,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         deadlift: 0,
         overheadPress: 0,
     });
+    const [variantSettings, setVariantSettings] = useState<VariantSettings>(defaultVariantSettings);
+    const [bbbSettings, setBbbSettings] = useState<BBBSettings>({ enabled: false, percentage: 0 });
 
     // Load settings from AsyncStorage on app start
     useEffect(() => {
@@ -277,7 +306,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     const loadSettings = async () => {
         try {
-            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData, workoutHistoryData, trainingMaxDecreasesData] = await Promise.all([
+            const [unitData, scheduleData, progressionData, oneRepMaxData, trainingMaxData, workingSetData, warmupData, scrollData, cycleData, weekData, workoutHistoryData, trainingMaxDecreasesData, variantData, bbbData] = await Promise.all([
                 AsyncStorage.getItem('settings_unit'),
                 AsyncStorage.getItem('settings_workoutSchedule'),
                 AsyncStorage.getItem('settings_exerciseProgression'),
@@ -290,6 +319,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
                 AsyncStorage.getItem('workout_currentWeek'),
                 AsyncStorage.getItem('workout_history'),
                 AsyncStorage.getItem('workout_trainingMaxDecreases'),
+                AsyncStorage.getItem('settings_variantSettings'),
+                AsyncStorage.getItem('settings_bbbSettings'),
             ]);
 
             if (unitData) {
@@ -327,6 +358,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             }
             if (trainingMaxDecreasesData) {
                 setTrainingMaxDecreases(JSON.parse(trainingMaxDecreasesData));
+            }
+            if (variantData) {
+                setVariantSettings(JSON.parse(variantData));
+            }
+            if (bbbData) {
+                setBbbSettings(JSON.parse(bbbData));
             }
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -592,30 +629,35 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         exerciseProgression: boolean;
         oneRepMax: boolean;
         trainingMaxPercentage: boolean;
+        variantSettings: boolean;
     } => {
         // Check if workout schedule is empty
-        const hasSchedule = Object.values(workoutSchedule).every(day => day !== '');
+        const hasWorkoutSchedule = Object.values(workoutSchedule).some(day => day !== '');
 
-        // Check if progression values are set
-        const hasProgression = Object.values(exerciseProgression).every(value => value > 0);
+        // Check if exercise progression is set
+        const hasExerciseProgression = Object.values(exerciseProgression).some(progression => progression > 0);
 
         // Check if 1RM values are set
-        const hasOneRepMax = Object.values(oneRepMax).every(value => value > 0);
+        const hasOneRepMax = Object.values(oneRepMax).some(weight => weight > 0);
 
-        // Check if training max percentage is set (default is 90, so we check if it's not 0)
+        // Check if training max percentage is set
         const hasTrainingMaxPercentage = trainingMaxPercentage.percentage > 0;
 
+        // Check if variant settings are set
+        const hasVariantSettings = variantSettings.variant !== 'nothing' || variantSettings.bbbPercentage > 0;
+
         return {
-            workoutSchedule: !hasSchedule,
-            exerciseProgression: !hasProgression,
+            workoutSchedule: !hasWorkoutSchedule,
+            exerciseProgression: !hasExerciseProgression,
             oneRepMax: !hasOneRepMax,
             trainingMaxPercentage: !hasTrainingMaxPercentage,
+            variantSettings: !hasVariantSettings,
         };
     };
 
     const getOnboardingProgress = (): number => {
         const missingItems = getMissingOnboardingItems();
-        const totalItems = 4; // workoutSchedule, exerciseProgression, oneRepMax, trainingMaxPercentage
+        const totalItems = 5; // workoutSchedule, exerciseProgression, oneRepMax, trainingMaxPercentage, variantSettings
         const completedItems = totalItems - Object.values(missingItems).filter(Boolean).length;
         return Math.round((completedItems / totalItems) * 100);
     };
@@ -671,8 +713,26 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         }
     };
 
+    // Save variant settings
+    const saveVariantSettings = async (settings: VariantSettings) => {
+        try {
+            await AsyncStorage.setItem('settings_variantSettings', JSON.stringify(settings));
+        } catch (error) {
+            console.error('Error saving variant settings:', error);
+        }
+    };
+
+    // Save BBB settings
+    const saveBbbSettings = async (settings: BBBSettings) => {
+        try {
+            await AsyncStorage.setItem('settings_bbbSettings', JSON.stringify(settings));
+        } catch (error) {
+            console.error('Error saving BBB settings:', error);
+        }
+    };
+
     // Complete a workout
-    const completeWorkout = async (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string) => {
+    const completeWorkout = async (exercise: keyof WorkoutSchedule, cycle: number, week: number, reps: number, weight: string, scheduledDate?: string) => {
         const today = new Date().toISOString().split('T')[0];
         const workoutKey = `${exercise}_${cycle}_${week}`;
 
@@ -687,7 +747,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             exercise,
             cycle,
             week,
-            scheduledDate: today,
+            scheduledDate: scheduledDate || today,
             status: 'completed',
             completedDate: today,
             reps,
@@ -714,7 +774,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     };
 
     // Mark a workout as missed
-    const markWorkoutAsMissed = async (exercise: keyof WorkoutSchedule, cycle: number, week: number) => {
+    const markWorkoutAsMissed = async (exercise: keyof WorkoutSchedule, cycle: number, week: number, scheduledDate?: string) => {
         const today = new Date().toISOString().split('T')[0];
 
         const existingWorkoutIndex = workoutHistory.workouts.findIndex(
@@ -725,7 +785,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             exercise,
             cycle,
             week,
-            scheduledDate: today,
+            scheduledDate: scheduledDate || today,
             status: 'missed'
         };
 
@@ -812,9 +872,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     };
 
     const undoWorkout = async (exercise: keyof WorkoutSchedule, cycle: number, week: number) => {
-        const today = new Date().toISOString().split('T')[0];
-        const workoutKey = `${exercise}_${cycle}_${week}`;
-
         const existingWorkoutIndex = workoutHistory.workouts.findIndex(
             w => w.exercise === exercise && w.cycle === cycle && w.week === week
         );
@@ -825,6 +882,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             const scheduledDate = new Date(completedWorkout.scheduledDate);
             const now = new Date();
             let status: 'upcoming' | 'today' | 'missed' = 'upcoming';
+
             if (scheduledDate.toDateString() === now.toDateString()) {
                 status = 'today';
             } else if (scheduledDate < now) {
@@ -832,6 +890,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             } else {
                 status = 'upcoming';
             }
+
             const restoredWorkout: WorkoutStatus = {
                 exercise,
                 cycle,
@@ -839,25 +898,29 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
                 scheduledDate: completedWorkout.scheduledDate,
                 status
             };
+
             let newWorkouts = [...workoutHistory.workouts];
             newWorkouts[existingWorkoutIndex] = restoredWorkout;
-            if (completedWorkout.status === 'completed') {
-                // Mark the workout as missed
-                await markWorkoutAsMissed(exercise, cycle, week);
-            } else {
-                // Mark the workout as upcoming
-                const upcomingWorkout: WorkoutStatus = {
-                    exercise,
-                    cycle,
-                    week,
-                    scheduledDate: today,
-                    status: 'upcoming'
-                };
-                let newWorkouts = [...workoutHistory.workouts];
-                newWorkouts[existingWorkoutIndex] = upcomingWorkout;
-                await saveWorkoutHistory({ workouts: newWorkouts });
-            }
+            await saveWorkoutHistory({ workouts: newWorkouts });
         }
+    };
+
+    const updateVariant = async (variant: 'nothing' | 'bigButBoring') => {
+        const newSettings = { ...variantSettings, variant };
+        setVariantSettings(newSettings);
+        await saveVariantSettings(newSettings);
+    };
+
+    const updateBbbPercentage = async (percentage: number) => {
+        const newSettings = { ...bbbSettings, percentage };
+        setBbbSettings(newSettings);
+        await saveBbbSettings(newSettings);
+    };
+
+    const updateBbbEnabled = async (enabled: boolean) => {
+        const newSettings = { ...bbbSettings, enabled };
+        setBbbSettings(newSettings);
+        await saveBbbSettings(newSettings);
     };
 
     const value = {
@@ -886,6 +949,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         setWarmupSets: saveWarmupSets,
         updateWarmupSet,
         toggleWarmupEnabled,
+        // Variant Settings
+        variantSettings,
+        setVariantSettings,
+        updateVariant,
+        updateBbbPercentage,
+        // BBB Settings
+        bbbSettings,
+        setBbbSettings,
+        updateBbbEnabled,
         scrollPositions,
         saveScrollPosition,
         getScrollPosition,

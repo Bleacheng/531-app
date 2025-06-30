@@ -33,6 +33,12 @@ export const SettingsScreen: React.FC = () => {
         warmupSets,
         updateWarmupSet,
         toggleWarmupEnabled,
+        variantSettings,
+        updateVariant,
+        updateBbbPercentage,
+        bbbSettings,
+        setBbbSettings,
+        updateBbbEnabled,
         saveScrollPosition,
         getScrollPosition,
         setWorkoutSchedule,
@@ -40,6 +46,7 @@ export const SettingsScreen: React.FC = () => {
         setOneRepMax,
         setTrainingMaxPercentage,
         setWarmupSets,
+        setVariantSettings,
         trainingMaxDecreases,
         decreaseTrainingMax,
         resetTrainingMaxDecreases,
@@ -85,6 +92,16 @@ export const SettingsScreen: React.FC = () => {
         set3Reps: warmupSets.set3.reps > 0 ? warmupSets.set3.reps.toString() : '',
     });
 
+    // Local state for variant inputs
+    const [variantInputs, setVariantInputs] = useState({
+        bbbPercentage: variantSettings.bbbPercentage > 0 ? variantSettings.bbbPercentage.toString() : '50',
+    });
+
+    // Local state for BBB inputs
+    const [bbbInputs, setBbbInputs] = useState({
+        percentage: bbbSettings.percentage > 0 ? bbbSettings.percentage.toString() : '50',
+    });
+
     // Update local state when context values change
     useEffect(() => {
         setProgressionInputs({
@@ -115,6 +132,18 @@ export const SettingsScreen: React.FC = () => {
         });
     }, [warmupSets]);
 
+    useEffect(() => {
+        setVariantInputs({
+            bbbPercentage: variantSettings.bbbPercentage > 0 ? variantSettings.bbbPercentage.toString() : '50',
+        });
+    }, [variantSettings]);
+
+    useEffect(() => {
+        setBbbInputs({
+            percentage: bbbSettings.percentage > 0 ? bbbSettings.percentage.toString() : '50',
+        });
+    }, [bbbSettings]);
+
     // Training max percentage options (80% to 100% in 5% increments)
     const trainingMaxOptions = [
         { value: 80, label: '80%' },
@@ -122,6 +151,12 @@ export const SettingsScreen: React.FC = () => {
         { value: 90, label: '90%' },
         { value: 95, label: '95%' },
         { value: 100, label: '100%' },
+    ];
+
+    // Variant options
+    const variantOptions = [
+        { value: 'nothing' as const, label: 'Nothing', description: 'No additional work' },
+        { value: 'bigButBoring' as const, label: 'Big But Boring', description: '5 sets of 10 reps at BBB% of TM' },
     ];
 
     // Local state for modals
@@ -234,16 +269,51 @@ export const SettingsScreen: React.FC = () => {
     };
 
     const handleWarmupBlur = (set: 'set1' | 'set2' | 'set3', field: 'percentage' | 'reps') => {
-        const inputKey = `${set}${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof typeof warmupInputs;
-        const numValue = parseFloat(warmupInputs[inputKey]);
-        const currentValue = field === 'percentage' ? warmupSets[set].percentage : warmupSets[set].reps;
-
-        if (isNaN(numValue) || numValue <= 0 || (field === 'percentage' && numValue > 100)) {
+        const currentValue = warmupInputs[`${set}${field.charAt(0).toUpperCase() + field.slice(1)}` as keyof typeof warmupInputs];
+        const numValue = parseFloat(currentValue);
+        if (isNaN(numValue) || numValue <= 0) {
             // Reset to current value if invalid
+            const currentWarmupValue = warmupSets[set][field];
             setWarmupInputs(prev => ({
                 ...prev,
-                [inputKey]: currentValue > 0 ? currentValue.toString() : ''
+                [`${set}${field.charAt(0).toUpperCase() + field.slice(1)}`]: currentWarmupValue > 0 ? currentWarmupValue.toString() : ''
             }));
+        }
+    };
+
+    // Handle variant changes
+    const handleVariantChange = (variant: 'nothing' | 'bigButBoring') => {
+        updateVariant(variant);
+        // Automatically enable/disable BBB based on variant selection
+        updateBbbEnabled(variant === 'bigButBoring');
+    };
+
+    const handleBbbPercentageBlur = () => {
+        const numValue = parseFloat(variantInputs.bbbPercentage);
+        if (isNaN(numValue) || numValue <= 0 || numValue > 100) {
+            // Reset to current value if invalid
+            setVariantInputs(prev => ({
+                ...prev,
+                bbbPercentage: variantSettings.bbbPercentage > 0 ? variantSettings.bbbPercentage.toString() : '50'
+            }));
+        } else {
+            // Update the variant settings with the valid percentage
+            updateBbbPercentage(numValue);
+        }
+    };
+
+    // Handle BBB changes
+    const handleBbbPercentageChange = (value: string) => {
+        // Always update local state
+        setBbbInputs(prev => ({
+            ...prev,
+            percentage: value
+        }));
+
+        // Only update context if it's a valid number
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue > 0 && numValue <= 100) {
+            updateBbbPercentage(numValue);
         }
     };
 
@@ -311,6 +381,20 @@ export const SettingsScreen: React.FC = () => {
             };
             setWarmupSets(defaultWarmup);
 
+            // Reset variant settings to defaults
+            const defaultVariant = {
+                variant: 'nothing' as const,
+                bbbPercentage: 50,
+            };
+            setVariantSettings(defaultVariant);
+
+            // Reset BBB settings to defaults
+            const defaultBbb = {
+                enabled: false,
+                percentage: 50,
+            };
+            setBbbSettings(defaultBbb);
+
             // Update local state for progression inputs
             setProgressionInputs({
                 benchPress: '',
@@ -335,6 +419,11 @@ export const SettingsScreen: React.FC = () => {
                 set2Reps: defaultWarmup.set2.reps.toString(),
                 set3Percentage: defaultWarmup.set3.percentage.toString(),
                 set3Reps: defaultWarmup.set3.reps.toString(),
+            });
+
+            // Update local state for variant inputs
+            setVariantInputs({
+                bbbPercentage: defaultVariant.bbbPercentage.toString(),
             });
 
             setResetSettingsModalVisible(false);
@@ -384,6 +473,14 @@ export const SettingsScreen: React.FC = () => {
             const emptyTrainingMax = {
                 percentage: 0,
             };
+            const emptyVariant = {
+                variant: 'nothing' as const,
+                bbbPercentage: 50,
+            };
+            const emptyBbb = {
+                enabled: false,
+                percentage: 50,
+            };
 
             // Save empty values
             await Promise.all([
@@ -391,6 +488,8 @@ export const SettingsScreen: React.FC = () => {
                 setExerciseProgression(emptyProgression),
                 setOneRepMax(emptyOneRepMax),
                 setTrainingMaxPercentage(emptyTrainingMax),
+                setVariantSettings(emptyVariant),
+                setBbbSettings(emptyBbb),
             ]);
 
             // Update local state to reflect empty values
@@ -1599,6 +1698,125 @@ export const SettingsScreen: React.FC = () => {
                             </TouchableOpacity>
                         </View>
 
+                        {/* Variant Settings */}
+                        <View style={{ marginBottom: 20 }}>
+                            <Text
+                                style={{
+                                    fontSize: 16,
+                                    fontWeight: '600',
+                                    color: isDark ? COLORS.textDark : COLORS.text,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Variant
+                            </Text>
+                            <Text
+                                style={{
+                                    fontSize: 12,
+                                    color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                Choose additional work to perform after main sets
+                            </Text>
+                            <View style={{ gap: 12 }}>
+                                {variantOptions.map((option) => (
+                                    <TouchableOpacity
+                                        key={option.value}
+                                        onPress={() => handleVariantChange(option.value)}
+                                        style={{
+                                            backgroundColor: variantSettings.variant === option.value
+                                                ? (isDark ? COLORS.primaryDark + '20' : COLORS.primary + '20')
+                                                : (isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary),
+                                            borderWidth: 1,
+                                            borderColor: variantSettings.variant === option.value
+                                                ? (isDark ? COLORS.primary : COLORS.primaryDark)
+                                                : (isDark ? COLORS.borderDark : COLORS.border),
+                                            borderRadius: 8,
+                                            padding: 12,
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    style={{
+                                                        fontSize: 16,
+                                                        fontWeight: '600',
+                                                        color: isDark ? COLORS.textDark : COLORS.text,
+                                                        marginBottom: 4,
+                                                    }}
+                                                >
+                                                    {option.label}
+                                                </Text>
+                                                <Text
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                                    }}
+                                                >
+                                                    {option.description}
+                                                </Text>
+                                            </View>
+                                            {variantSettings.variant === option.value && (
+                                                <CheckCircle size={20} color={isDark ? COLORS.primary : COLORS.primaryDark} />
+                                            )}
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+
+                            {/* BBB Percentage Input - Only show when Big But Boring is selected */}
+                            {variantSettings.variant === 'bigButBoring' && (
+                                <View style={{ marginTop: 16 }}>
+                                    <Text
+                                        style={{
+                                            fontSize: 14,
+                                            fontWeight: '600',
+                                            color: isDark ? COLORS.textDark : COLORS.text,
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        BBB Percentage of Training Max
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            fontSize: 12,
+                                            color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary,
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        Percentage of training max to use for BBB sets (typically 40-60%)
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <TextInput
+                                            style={{
+                                                flex: 1,
+                                                borderWidth: 1,
+                                                borderColor: isDark ? COLORS.borderDark : COLORS.border,
+                                                borderRadius: 8,
+                                                padding: 12,
+                                                color: isDark ? COLORS.textDark : COLORS.text,
+                                                backgroundColor: isDark ? COLORS.backgroundTertiaryDark : COLORS.backgroundTertiary,
+                                                fontSize: 16,
+                                            }}
+                                            keyboardType="numeric"
+                                            value={variantInputs.bbbPercentage}
+                                            onChangeText={(text) => {
+                                                const sanitized = text.replace(/[^0-9.]/g, '');
+                                                setVariantInputs(prev => ({ ...prev, bbbPercentage: sanitized }));
+                                            }}
+                                            onBlur={handleBbbPercentageBlur}
+                                            placeholder="50"
+                                        />
+                                        <Text style={{ marginLeft: 8, color: isDark ? COLORS.textSecondaryDark : COLORS.textSecondary, fontSize: 16 }}>
+                                            %
+                                        </Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+
                         {/* Working Set Percentages Info */}
                         <View>
                             <Text
@@ -1885,12 +2103,9 @@ export const SettingsScreen: React.FC = () => {
                             <Button
                                 onPress={handleResetSettings}
                                 variant="outline"
-                                fullWidth
-                                style={{
-                                    borderColor: isDark ? COLORS.warning : COLORS.warningDark,
-                                }}
+                                style={{ backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20' }}
                             >
-                                Reset Settings
+                                Reset All Settings
                             </Button>
                         </View>
 
@@ -1921,12 +2136,35 @@ export const SettingsScreen: React.FC = () => {
                             <Button
                                 onPress={handleResetData}
                                 variant="outline"
-                                fullWidth
-                                style={{
-                                    borderColor: isDark ? COLORS.error : COLORS.errorDark,
-                                }}
+                                style={{ backgroundColor: isDark ? COLORS.errorDark + '20' : COLORS.error + '20' }}
                             >
-                                Clear All Data
+                                Reset All Data
+                            </Button>
+                        </View>
+
+                        <View style={{ gap: 12 }}>
+                            <Button
+                                onPress={() => {
+                                    Alert.alert(
+                                        'Clear Workout History',
+                                        'This will clear all workout history but keep your settings. This can help fix date issues.',
+                                        [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            {
+                                                text: 'Clear History',
+                                                style: 'destructive',
+                                                onPress: () => {
+                                                    clearWorkoutHistory();
+                                                    Alert.alert('Success', 'Workout history cleared.');
+                                                }
+                                            }
+                                        ]
+                                    );
+                                }}
+                                variant="outline"
+                                style={{ backgroundColor: isDark ? COLORS.warningDark + '20' : COLORS.warning + '20' }}
+                            >
+                                Clear Workout History Only
                             </Button>
                         </View>
                     </Card>
